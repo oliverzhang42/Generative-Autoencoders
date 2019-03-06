@@ -74,15 +74,8 @@ class GenerativeFramework():
             raise NotImplementedError
 
 
-    def train_autoencoder(self, x_train=None, x_test=None, lr=0.001, epochs=10, batch_size=None):
-        if x_train is None:
-            x_train = self.x_train
-        if x_test is None:
-        	x_test = self.x_test
-        if batch_size is None:
-        	batch_size = self.batch_size
-
-        self.autoencoder.train(x_train, x_test=x_test, lr=lr, epochs=epochs, batch_size=batch_size)
+    def train_autoencoder(self, lr=0.001, epochs=10):
+        self.autoencoder.train(self.x_train, x_test=self.x_test, lr=lr, epochs=epochs)
         
     def evaluate_autoencoder(self, data=None):
         if data is None:
@@ -105,10 +98,10 @@ class GenerativeFramework():
         self.generator.train(**kwargs)
 
     def save_generator(self, file_name):
-    	self.generator.save_weights(file_name)
+    	self.generator.save(file_name)
 
     def load_generator(self, file_name):
-    	self.generator.load_weights(file_name)
+    	self.generator.load(file_name)
 
     def generate_images(self, file_name, number=10000):
         encodings = self.generator.generate(number)

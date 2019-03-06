@@ -46,10 +46,7 @@ class Autoencoder():
         opt = Adam(lr, beta_1=0.5, beta_2=0.999)
         self.autoencoder.compile(optimizer=opt, loss='mse')
 
-    def train(self, x_train, x_test=None, lr=0.001, epochs=10, batch_size=None):
-        if batch_size is None:
-            batch_size = self.batch_size
-
+    def train(self, x_train, x_test=None, lr=0.001, epochs=10):
         autoencoder = self.autoencoder
         self.compile(lr=lr)
 

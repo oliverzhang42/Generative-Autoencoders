@@ -2,8 +2,13 @@
 from GenerativeFramework import GenerativeFramework
 from evaluate import evaluate
 
-WEIGHT_PATH = '/data/home/oliver/git/generative_autoencoders/weights'
-IMG_PATH = '/data/home/oliver/git/generative_autoencoders/images'
+from utils import *
+
+import os
+
+PATH = '/data/home/oliver/git/generative_autoencoders'
+WEIGHT_PATH = os.path.join(PATH, 'weights')
+IMG_PATH = os.path.join(PATH, 'images')
 DATASET = 'mnist'
 AUTOENCODER = 'dense'
 DIM = 10
@@ -26,5 +31,7 @@ frame.initialize_generator(recompute=False, file_inputs='ot_map_inputs.npy', fil
 
 frame.load_generator("OTMap1")
 
-frame.generate_images("AEOT")
-evaluate("images/AEOT.npy")
+#frame.generate_images("AEOT")
+#evaluate("images/AEOT.npy")
+
+display(os.path.join(IMG_PATH, 'AEOT.npy'))
