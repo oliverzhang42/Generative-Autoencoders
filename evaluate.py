@@ -1,13 +1,3 @@
-# TODO: Turn evaluate into a nice function.
-
-
-
-
-
-
-
-
-
 import gzip
 import os
 
@@ -27,8 +17,6 @@ import scipy.io
 import pdb
 
 print ("PACKAGES LOADED")
-
-FILE = "./images/AEOT.npy"
 
 def CNN(inputs, _is_training=True):
     x   = tf.reshape(inputs, [-1, 28, 28, 1])
@@ -84,21 +72,21 @@ def softmax(x):
     e_x = np.exp(x - np.max(x))
     return e_x / np.expand_dims(e_x.sum(axis=1), axis=1)   # only difference
 
-# RESTORE SAVED NETWORK
-saver.restore(sess, "model.ckpt")
+def evaluate(file, fashion=False):
+    # RESTORE SAVED NETWORK
+    if fashion:
+        saver.restore(sess, "./fashion_mnist_weights/model.ckpt")
+    else:
+        saver.restore(sess, "./mnist_weights/model.ckpt")
 
-temp = []
+    # folders for generated images
+    result_folder = './'
 
-# folders for generated images
-result_folder = './'
-
-icp = []
-for k in range(50):
-    k = k + 1
+    icp = []
     # result_folder = '../GAN/ali_bigan/ali_shell_results/'
     # mat = scipy.io.loadmat(result_folder+ '2_2_2_256_256_1024.mat' )
     # mat = scipy.io.loadmat(result_folder+ '{}.mat'.format(str(k).zfill(3)))
-    test_data = np.reshape(np.load(FILE), (10000, 784))
+    test_data = np.reshape(np.load(file), (10000, 784))
     if np.max(test_data) > 0.75:
         test_data -= 0.5
     # test_data  = mat['images']
@@ -112,9 +100,6 @@ for k in range(50):
     for i in range(total_batch):
         offset = (i * batch_size) % (test_size)
         batch_xs = test_data[offset:(offset + batch_size), :]
-        if len(temp) == 0:
-          print('hi')
-          temp = batch_xs
         y_final = sess.run(y, feed_dict={x: batch_xs, is_training: False})
         pred_softmax = softmax(y_final)
         preds.append(pred_softmax)
@@ -139,4 +124,6 @@ for k in range(50):
     icp.append((np.mean(scores) , np.std(scores)))
     print("Inception score is: %.4f, %.4f" % (np.mean(scores) , np.std(scores)))
 
-scipy.io.savemat('ali_inception_50.mat', mdict={'icp': icp})
+    return (np.mean(scores), np.std(scores))
+
+    #scipy.io.savemat('ali_inception_50.mat', mdict={'icp': icp})
