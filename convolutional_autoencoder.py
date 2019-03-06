@@ -2,10 +2,9 @@ from autoencoder import Autoencoder
 
 import keras
 from keras.models import Model
-from keras.layers import Input, Dense, LeakyReLU, Flatten, BatchNormalization, Conv2D, Conv2DTranspose
+from keras.layers import Input, Dense, LeakyReLU, Flatten, BatchNormalization, Conv2D, Conv2DTranspose, Reshape
 from keras.optimizers import Adam
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 import os
@@ -26,9 +25,9 @@ class ConvolutionalAutoencoder(Autoencoder):
         net1 = Dense(128)(net1)
         net1 = LeakyReLU()(net1)
         net1 = BatchNormalization()(net1)
-        encoded = Dense(dim, activation='sigmoid')(net1)
+        encoded = Dense(self.dim, activation='sigmoid')(net1)
 
-        input_sequence = Input(shape=(dim,))
+        input_sequence = Input(shape=(self.dim,))
         net2 = Dense(128)(input_sequence)
         net2 = LeakyReLU()(net2)
         net2 = Dense(49)(input_sequence)
@@ -45,4 +44,4 @@ class ConvolutionalAutoencoder(Autoencoder):
 
         self.encoder = Model(input_img, encoded)
         self.decoder = Model(input_sequence, decoded)
-        self.autoencoder = Model(input_img, decoder(encoded))
+        self.autoencoder = Model(input_img, self.decoder(encoded))
