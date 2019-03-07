@@ -1,20 +1,27 @@
 from autoencoder import Autoencoder
+from ClusteringGenerator import ClusteringGenerator
 from convolutional_autoencoder import ConvolutionalAutoencoder
 import keras
+from KDEGenerator import KDEGenerator
 from keras.datasets import mnist, fashion_mnist
 
 import numpy as np
 
 import os
 from OTGenerator import OTGenerator
+from PTGenerator import PTGenerator
+from RandomGenerator import RandomGenerator
 
 class GenerativeFramework():
-    def __init__(self, weight_path, img_path, dataset='mnist', autoencoder='dense', dim=10, generator='ot transport', pruning=False, layers=4, batch_size=512):
+    def __init__(self, weight_path, img_path, dataset='mnist', autoencoder='dense', 
+        dim=10, generator='ot transport', pruning=False, layers=4, batch_size=512, 
+        distr='uniform', ratio=1, clusters=20, noise_intensity=0.15):
         assert os.path.isdir(weight_path), 'The given path isnt a directory!'
         assert os.path.isdir(img_path), 'The given path isnt a directory!'
         assert dataset in ['mnist', 'fashion-mnist', 'lfw', 'cifar10'], 'The dataset is not recognized!'
         assert autoencoder in ['dense', 'conv', 'cond'], 'The autoencoder is not recognized!'
-        assert generator in ['ot transport', 'ot generator', 'st transport', 'kde', 'k-means'], 'The generator is not recognized!'
+        assert generator in ['ot transport', 'ot generator', 'pt transport', 'kde', 'k-means', 'random'], 'The generator is not recognized!'
+        assert distr in ['uniform', 'normal'], 'The random distribution is not recognized!'
 
         self.weight_path = weight_path
         self.img_path = img_path
@@ -63,15 +70,17 @@ class GenerativeFramework():
             raise NotImplementedError
         
         if generator == 'ot transport':
-            self.generator = OTGenerator(weight_path, batch_size=batch_size, pruning=pruning, layers=layers)
+            self.generator = OTGenerator(weight_path, batch_size=batch_size, pruning=pruning, layers=layers, distr=distr, ratio=ratio)
         elif generator == 'ot generator':
             raise NotImplementedError
-        elif generator == 'st transport':
-            raise NotImplementedError
+        elif generator == 'pt transport':
+            self.generator = PTGenerator(weight_path, batch_size=batch_size, pruning=pruning, layers=layers, distr=distr, ratio=ratio)
         elif generator == 'kde':
-            raise NotImplementedError
+            self.generator = KDEGenerator(distr=distr, noise_intensity=noise_intensity)
         elif generator == 'k-means':
-            raise NotImplementedError
+            self.generator = ClusteringGenerator(clusters=clusters)
+        elif generator == 'random':
+            self.generator = RandomGenerator(distr=distr)
 
 
     def train_autoencoder(self, lr=0.001, epochs=10):
@@ -91,7 +100,7 @@ class GenerativeFramework():
         self.autoencoder.save_weights(file_name)
 
     def initialize_generator(self, recompute, file_inputs, file_answers): # TODO: Either switch everything to regular args or switch this to kwargs
-    	encodings = self.autoencoder.encode(self.x_train)
+    	encodings = self.autoencoder.encode(self.x_train) #Fix?
     	self.generator.initialize(encodings, recompute, file_inputs, file_answers)
 
     def train_generator(self, **kwargs):

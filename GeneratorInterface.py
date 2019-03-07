@@ -1,15 +1,15 @@
 class GeneratorInterface():
     def initialize(self):
-    	pass
+        pass
 
     def train(self):
         pass
 
     def save(self):
-    	pass
+        pass
 
     def load(self):
-    	pass
+        pass
 
     def generate(self):
         pass

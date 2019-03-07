@@ -13,12 +13,17 @@ import ot
 from utils import *
 
 class OTGenerator(GeneratorInterface):
-    def __init__(self, path, batch_size=512, pruning=False, layers=4):
+    def __init__(self, path, batch_size=512, pruning=False, layers=4, distr='uniform', ratio=1):
         assert os.path.isdir(path), "Given path is not a proper directory!"
+        assert ratio <= 1, "You cannot have more than 100\% of the data!"
 
         self.path = path
         self.batch_size = batch_size
         self.layers=layers
+        self.distr=distr
+
+        # The proportion of the encodings you use to generate your training answers
+        self.ratio=ratio
 
         if pruning:
             raise NotImplementedError
@@ -33,7 +38,7 @@ class OTGenerator(GeneratorInterface):
         self.encoding_length = encodings.shape[1]
 
         if recompute:
-            self.ot_get_answers()
+            self.get_answers()
 
             if (not (file_inputs is None)) and (not (file_answers is None)):
                 self.save_data(file_inputs, file_answers)
@@ -49,18 +54,18 @@ class OTGenerator(GeneratorInterface):
     def create_model(self, layers=4):
         model = Sequential()
         for i in range(layers):
-          model.add(Dense(512, input_shape=(self.encoding_length,)))
-          model.add(LeakyReLU(alpha=0.2))
+            model.add(Dense(512, input_shape=(self.encoding_length,)))
+            model.add(LeakyReLU(alpha=0.2))
         model.add(Dense(self.encoding_length, name='dense'))
 
         self.model = model
 
     def compile(self, lr=0.001):
         opt = Adam(lr, beta_1=0.5, beta_2=0.999)
-        self.model.compile(optimizer=opt, loss='mae')
+        self.model.compile(optimizer=opt, loss='mse') #Fix?
 
-    def ot_get_answers(self):
-        self.answers, self.inputs = ot_compute_answers(self.encodings, self.batch_size)
+    def get_answers(self):
+        self.answers, self.inputs = ot_compute_answers(self.encodings, self.batch_size, distr=self.distr, ratio=self.ratio)
 
     def save_data(self, file_inputs, file_answers):
         full_inputs = os.path.join(self.path, file_inputs)
@@ -73,11 +78,13 @@ class OTGenerator(GeneratorInterface):
         model = self.model
         self.compile(lr=lr)
 
-        train_set = self.inputs[:7*len(inputs)//10]
-        train_ans = self.answers[:7*len(inputs)//10]
+        train_set = self.inputs[:7*len(self.inputs)//10]
+        train_ans = self.answers[:7*len(self.answers)//10]
 
-        val_set = self.inputs[7*len(inputs)//10:]
-        val_ans = self.answers[7*len(inputs)//10:]
+        val_set = self.inputs[7*len(self.inputs)//10:]
+        val_ans = self.answers[7*len(self.answers)//10:]
+
+        import pudb; pudb.set_trace()
 
         model.fit(train_set, train_ans, validation_data=(val_set, val_ans), epochs=epochs)
 
@@ -93,5 +100,11 @@ class OTGenerator(GeneratorInterface):
         model = self.model
         self.compile()
 
-        inputs = np.random.random(size=(number, self.encoding_length))
+        if self.distr == 'uniform':
+            inputs = np.random.random(size=(number, self.encoding_length))
+        elif self.distr == 'normal':
+            inputs = np.random.normal(size=(number, self.encoding_length))
+        else:
+            raise Exception("I don't know what this distribution is: {}".format(distr))
+
         return self.model.predict(inputs)

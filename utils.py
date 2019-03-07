@@ -8,9 +8,9 @@ import ot
 
 
 def display(file_path):
-	images = np.load(file_path)
-	indices = np.random.choice(range(len(images)), size=16)
-	display_img(images[indices])
+    images = np.load(file_path)
+    indices = np.random.choice(range(len(images)), size=16)
+    display_img(images[indices])
 
 def display_img(x, single=False, labels=None, columns=4):
     if single:
@@ -30,8 +30,16 @@ def display_img(x, single=False, labels=None, columns=4):
     
     plt.show()
 
-def ot_compute_answers(encodings, batch_size):
-    inputs = np.random.random(size=encodings.shape)
+def ot_compute_answers(encodings, batch_size, distr, ratio=1):
+    import pudb; pudb.set_trace()
+    # TODO: Find some way of getting rid of ratio. Currently it doesn't do anything, 
+    # but it's placed here so that OTGen and PTGen fit well together
+    if distr == 'uniform':
+        inputs = np.random.random(size=encodings.shape)
+    elif distr == 'normal':
+        inputs = np.random.normal(size=encodings.shape)
+    else:
+        raise Exception("I don't recognize this distribution: {}".format(distr))
     answers = []
 
     for i in range(len(encodings) // batch_size):
@@ -50,7 +58,8 @@ def ot_compute_answers(encodings, batch_size):
             costs = []
             
             for k in range(batch_size):
-                costs.append(np.sum(np.abs(fake_vec[j] - real_vec[k]))) # TODO: Debug the abs & sum & encodings vs real_vec?
+                costs.append(np.linalg.norm(fake_vec[j] - real_vec[k]))
+                #costs.append(np.sum(np.abs(fake_vec[j] - real_vec[k]))) # TODO: Debug the abs & sum & encodings vs real_vec?
             M.append(costs)
             
         M = np.array(M)
@@ -62,3 +71,31 @@ def ot_compute_answers(encodings, batch_size):
 
     answers = np.array(answers)
     return (inputs, answers)
+
+def pt_compute_answers(encodings, batch_size, distr='uniform', ratio=1):
+    if distr == 'uniform':
+        inputs = np.random.random(size=encodings.shape)
+    elif distr == 'normal':
+        inputs = np.random.normal(size=encodings.shape)
+    else:
+        raise Exception("I don't recognize this distribution: {}".format(distr))
+    answers = []
+
+    for i in range(len(inputs)):
+        if i % 100 == 0:
+            print('Index: {} out of {}'.format(i, len(inputs)))
+        min_dist = 100000
+        index = 0
+        for j in range(int(len(inputs)*ratio)):
+            dist = np.linalg.norm(inputs[i] - encodings[j])
+            #dist = np.sum(np.abs(inputs[i] - encodings[j]))
+          
+            if dist < min_dist:
+                min_dist = dist
+                index = j
+          
+        answers.append(encodings[index])
+
+    answers = np.array(answers)
+
+    return(inputs, answers)
