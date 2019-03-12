@@ -15,4 +15,5 @@ class RandomGenerator(GeneratorInterface):
         if self.distr == 'uniform':
             return np.random.random(size=shape)
         elif self.distr == 'normal':
+        	print("LMAO, uhh, np.random.normal can return negative numbers?") # TODO: Fix
         	return np.random.normal(size=shape)

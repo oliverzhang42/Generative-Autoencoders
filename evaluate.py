@@ -13,9 +13,6 @@ import math
 import sys
 import scipy.io
 
-
-import pdb
-
 print ("PACKAGES LOADED")
 
 def CNN(inputs, _is_training=True):

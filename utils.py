@@ -30,20 +30,15 @@ def display_img(x, single=False, labels=None, columns=4):
     
     plt.show()
 
-def ot_compute_answers(encodings, batch_size, distr, ratio=1):
-    import pudb; pudb.set_trace()
+def ot_compute_answers(inputs, encodings, batch_size, verbose=True, ratio=1):
     # TODO: Find some way of getting rid of ratio. Currently it doesn't do anything, 
     # but it's placed here so that OTGen and PTGen fit well together
-    if distr == 'uniform':
-        inputs = np.random.random(size=encodings.shape)
-    elif distr == 'normal':
-        inputs = np.random.normal(size=encodings.shape)
-    else:
-        raise Exception("I don't recognize this distribution: {}".format(distr))
+
     answers = []
 
-    for i in range(len(encodings) // batch_size):
-        if i % 10 == 0:
+    for i in range(len(inputs) // batch_size): # VERRY HACKY!!! Right now I have this function handling both the case if you want ot for a whole dataset or a single batch
+        # Perhaps split that up later.
+        if i % 10 == 0 and verbose:
               print("Batch Number: {}".format(i))
 
         real_vec = encodings[i*batch_size: (i+1)*batch_size]

@@ -8,19 +8,21 @@ from keras.datasets import mnist, fashion_mnist
 import numpy as np
 
 import os
+from OTTransporter import OTTransporter
 from OTGenerator import OTGenerator
-from PTGenerator import PTGenerator
+from OTMultiHead import OTMultiHead
+from PTTransporter import PTTransporter
 from RandomGenerator import RandomGenerator
 
 class GenerativeFramework():
     def __init__(self, weight_path, img_path, dataset='mnist', autoencoder='dense', 
         dim=10, generator='ot transport', pruning=False, layers=4, batch_size=512, 
-        distr='uniform', ratio=1, clusters=20, noise_intensity=0.15):
+        distr='uniform', ratio=1, clusters=20, noise_intensity=0.15, heads=4):
         assert os.path.isdir(weight_path), 'The given path isnt a directory!'
         assert os.path.isdir(img_path), 'The given path isnt a directory!'
         assert dataset in ['mnist', 'fashion-mnist', 'lfw', 'cifar10'], 'The dataset is not recognized!'
         assert autoencoder in ['dense', 'conv', 'cond'], 'The autoencoder is not recognized!'
-        assert generator in ['ot transport', 'ot generator', 'pt transport', 'kde', 'k-means', 'random'], 'The generator is not recognized!'
+        assert generator in ['ot transport', 'ot generator', 'pt transport', 'kde', 'k-means', 'random', 'ot multi'], 'The generator is not recognized!'
         assert distr in ['uniform', 'normal'], 'The random distribution is not recognized!'
 
         self.weight_path = weight_path
@@ -70,11 +72,13 @@ class GenerativeFramework():
             raise NotImplementedError
         
         if generator == 'ot transport':
-            self.generator = OTGenerator(weight_path, batch_size=batch_size, pruning=pruning, layers=layers, distr=distr, ratio=ratio)
+            self.generator = OTTransporter(weight_path, batch_size=batch_size, pruning=pruning, layers=layers, distr=distr, ratio=ratio)
         elif generator == 'ot generator':
-            raise NotImplementedError
+            self.generator = OTGenerator(weight_path, batch_size=batch_size, layers=layers, distr=distr, ratio=ratio)
+        elif generator == 'ot multi':
+            self.generator = OTMultiHead(weight_path, batch_size=batch_size, layers=layers, distr=distr, ratio=ratio, heads=heads)
         elif generator == 'pt transport':
-            self.generator = PTGenerator(weight_path, batch_size=batch_size, pruning=pruning, layers=layers, distr=distr, ratio=ratio)
+            self.generator = PTTransporter(weight_path, batch_size=batch_size, pruning=pruning, layers=layers, distr=distr, ratio=ratio)
         elif generator == 'kde':
             self.generator = KDEGenerator(distr=distr, noise_intensity=noise_intensity)
         elif generator == 'k-means':
