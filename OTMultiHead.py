@@ -64,6 +64,8 @@ class OTMultiHead(OTTransporter):
             self.heads[i].compile(optimizer=opt, loss='mse') #Fix?
     
     def one_step(self):
+        import pudb; pudb.set_trace()
+
         indices = np.random.choice(range(len(self.inputs)), size=self.batch_size)
         inputs = self.base.predict(self.inputs[indices])
         answers = self.answers[indices]
@@ -74,9 +76,9 @@ class OTMultiHead(OTTransporter):
             predicted = self.heads[i].predict(inputs)
             losses.append(np.sum((predicted - answers)**2, axis=1))
         
-        train = [[] for i in range(len(self.heads))]
+        train = [[] for i in range(len(self.heads))] #[[1, 3], [2, 4], [5], [0]]
 
-        predictor_train = [[0 for i in range(len(self.heads))] for j in range(len(inputs))]
+        predictor_train = [[0 for i in range(len(self.heads))] for j in range(len(inputs))] #[[0, 0, 0, 1], [0, 1, 0, 0], [1, 0, 0, 0]]
 
         for i in range(len(inputs)):
             index = np.argmin([losses[j][i] for j in range(len(self.heads))])
