@@ -12,7 +12,7 @@ IMG_PATH = os.path.join(PATH, 'images')
 DATASET = 'mnist'
 AUTOENCODER = 'dense'
 DIM = 10
-GENERATOR = 'ot transport'
+GENERATOR = 'pt generator'
 PRUNING = False
 LAYERS = 4
 BATCH_SIZE = 500
@@ -34,16 +34,16 @@ frame.load_autoencoder("AE1")
 #frame.save_autoencoder("AE2")
 #frame.evaluate_autoencoder()
 
-frame.initialize_generator(recompute=True, file_inputs='ot_map_inputs_norm.npy', file_answers='ot_map_answers_norm.npy')
+frame.initialize_generator(recompute=True, file_inputs='ot_in.npy', file_answers='ot_ans.npy')
+#frame.initialize_generator(recompute=True, file_inputs='ot_map_inputs_norm.npy', file_answers='ot_map_answers_norm.npy')
 frame.train_generator(epochs=10)
 #frame.save_generator("OTMultiHead")
 
 #frame.load_generator("OTMap1")
 
-name="test.npy"
+name="AEOT.npy"
 
 frame.generate_images(name)
 evaluate("images/{}".format(name))
 #'''
 
-display(os.path.join(IMG_PATH, name))

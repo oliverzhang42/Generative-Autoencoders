@@ -12,6 +12,7 @@ from OTTransporter import OTTransporter
 from OTGenerator import OTGenerator
 from OTMultiHead import OTMultiHead
 from PTTransporter import PTTransporter
+from PTGenerator import PTGenerator
 from RandomGenerator import RandomGenerator
 
 class GenerativeFramework():
@@ -22,7 +23,7 @@ class GenerativeFramework():
         assert os.path.isdir(img_path), 'The given path isnt a directory!'
         assert dataset in ['mnist', 'fashion-mnist', 'lfw', 'cifar10'], 'The dataset is not recognized!'
         assert autoencoder in ['dense', 'conv', 'cond'], 'The autoencoder is not recognized!'
-        assert generator in ['ot transport', 'ot generator', 'pt transport', 'kde', 'k-means', 'random', 'ot multi'], 'The generator is not recognized!'
+        assert generator in ['ot transport', 'ot generator', 'pt transport', 'pt generator', 'kde', 'k-means', 'random', 'ot multi'], 'The generator is not recognized!'
         assert distr in ['uniform', 'normal'], 'The random distribution is not recognized!'
 
         self.weight_path = weight_path
@@ -79,13 +80,16 @@ class GenerativeFramework():
             self.generator = OTMultiHead(weight_path, batch_size=batch_size, layers=layers, distr=distr, ratio=ratio, heads=heads)
         elif generator == 'pt transport':
             self.generator = PTTransporter(weight_path, batch_size=batch_size, pruning=pruning, layers=layers, distr=distr, ratio=ratio)
+        elif generator == 'pt generator':
+            self.generator = PTGenerator(weight_path, batch_size=batch_size, pruning=pruning, layers=layers, distr=distr, ratio=ratio)
         elif generator == 'kde':
             self.generator = KDEGenerator(distr=distr, noise_intensity=noise_intensity)
         elif generator == 'k-means':
             self.generator = ClusteringGenerator(clusters=clusters)
         elif generator == 'random':
             self.generator = RandomGenerator(distr=distr)
-
+        else:
+            raise NotImplementedError
 
     def train_autoencoder(self, lr=0.001, epochs=10):
         self.autoencoder.train(self.x_train, x_test=self.x_test, lr=lr, epochs=epochs)

@@ -56,19 +56,19 @@ class OTTransporter(GeneratorInterface):
         for i in range(layers):
             model.add(Dense(512, input_shape=(self.encoding_length,)))
             model.add(LeakyReLU(alpha=0.2))
-        model.add(Dense(self.encoding_length, name='dense'))
+        model.add(Dense(self.encoding_length, name='dense', activation='sigmoid'))
 
         self.model = model
 
     def compile(self, lr=0.001):
         opt = Adam(lr, beta_1=0.5, beta_2=0.999)
-        self.model.compile(optimizer=opt, loss='mae') #Fix?
+        self.model.compile(optimizer=opt, loss='mse') #Fix?
 
     def get_answers(self):
         if self.distr == 'uniform':
-            random_input = np.random.random(size=(10000, self.encoding_length)) # Don't let it be hard coded
+            random_input = np.random.random(size=(len(self.encodings), self.encoding_length)) # Don't let it be hard coded
         elif self.distr == 'normal':
-            random_input = np.random.normal(size=(10000, self.encoding_length))
+            random_input = np.random.normal(size=(len(self.encodings), self.encoding_length))
         else:
             raise Exception("I don't understand the distribution {}".fomat(self.distr))
 
