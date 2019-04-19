@@ -67,13 +67,15 @@ def ot_compute_answers(inputs, encodings, batch_size, verbose=True, ratio=1):
     answers = np.array(answers)
     return (inputs, answers)
 
-def pt_compute_answers(encodings, batch_size, distr='uniform', ratio=1):
-    if distr == 'uniform':
-        inputs = np.random.random(size=encodings.shape)
-    elif distr == 'normal':
-        inputs = np.random.normal(size=encodings.shape)
-    else:
-        raise Exception("I don't recognize this distribution: {}".format(distr))
+def pt_compute_answers(encodings, batch_size, inputs=None, distr='uniform', ratio=1):
+    if inputs is None:
+        if distr == 'uniform':
+            inputs = np.random.random(size=encodings.shape)
+        elif distr == 'normal':
+            inputs = np.random.normal(size=encodings.shape)
+        else:
+            raise Exception("I don't recognize this distribution: {}".format(distr))
+    
     answers = []
 
     for i in range(len(inputs)):

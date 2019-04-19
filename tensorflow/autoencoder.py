@@ -55,10 +55,6 @@ class Autoencoder():
         else:
             autoencoder.fit(x_train, x_train, validation_data=(x_test, x_test), 
                 epochs=epochs)
-        
-    def evaluate(self, x_test):
-    	loss = self.autoencoder.evaluate(x_test)
-    	return loss
 
     def encode(self, data):
         self.compile()

@@ -13,20 +13,36 @@ import ot
 from utils import *
 
 class OTGenerator(OTTransporter):
-    def initialize(self, encodings, *args, **kwargs):
+    def initialize(self, encodings, *args, activation='sigmoid', input_length=10, **kwargs):
         assert len(encodings) % self.batch_size == 0, "The length of the encodings has to be divisible by batch_size!" #TODO: make this general!
         assert len(encodings.shape) == 2
 
         self.encodings = encodings
         self.encoding_length = encodings.shape[1]
+        self.input_length = 10
 
-        self.create_model(layers=self.layers)
+        self.create_model(layers=self.layers, activation=activation)
 
     def one_step(self):
         if self.distr == 'uniform':
-            inputs = np.random.random(size=(self.batch_size, self.encoding_length))
+            inputs = np.random.random(size=(self.batch_size, self.input_length))
         elif self.distr == 'normal':
-            inputs = np.random.normal(size=(self.batch_size, self.encoding_length))
+            inputs = np.random.normal(size=(self.batch_size, self.input_length))
+        elif self.distr == 'multi':
+            assert self.batch_size % 10 == 0, "Batch Size needs to be divisible by 10."
+
+            inputs = None
+
+            for i in range(self.input_length):
+                shifted = np.random.normal(size=(self.batch_size//10, self.input_length))
+                shifted[:,i] += 2*np.ones(shape=(self.batch_size//10))
+
+                if i == 0:
+                    inputs = shifted
+                else:
+                    inputs = np.concatenate((inputs, shifted))
+        else:
+            raise Exception("I don't understand the distribution {}".fomat(self.distr))
 
         predicted = self.model.predict(inputs)
         
@@ -34,7 +50,7 @@ class OTGenerator(OTTransporter):
         real = self.encodings[indicies]
 
         test, answers = ot_compute_answers(predicted, real, self.batch_size, verbose=False)
-
+        
         return self.model.train_on_batch(inputs, answers)
 
     def train(self, lr=0.001, epochs=10):

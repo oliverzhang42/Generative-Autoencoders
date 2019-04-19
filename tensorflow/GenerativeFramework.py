@@ -1,4 +1,5 @@
 from autoencoder import Autoencoder
+from autoencoder_identity import Identity
 from ClusteringGenerator import ClusteringGenerator
 from convolutional_autoencoder import ConvolutionalAutoencoder
 import keras
@@ -6,6 +7,8 @@ from KDEGenerator import KDEGenerator
 from keras.datasets import mnist, fashion_mnist
 
 import numpy as np
+
+from math import *
 
 import os
 from OTTransporter import OTTransporter
@@ -21,10 +24,10 @@ class GenerativeFramework():
         distr='uniform', ratio=1, clusters=20, noise_intensity=0.15, heads=4):
         assert os.path.isdir(weight_path), 'The given path isnt a directory!'
         assert os.path.isdir(img_path), 'The given path isnt a directory!'
-        assert dataset in ['mnist', 'fashion-mnist', 'lfw', 'cifar10'], 'The dataset is not recognized!'
-        assert autoencoder in ['dense', 'conv', 'cond'], 'The autoencoder is not recognized!'
+        assert dataset in ['mnist', 'fashion-mnist', 'lfw', 'cifar10', 'toy_eight', 'toy_two'], 'The dataset is not recognized!'
+        assert autoencoder in ['dense', 'conv', 'cond', 'identity'], 'The autoencoder is not recognized!'
         assert generator in ['ot transport', 'ot generator', 'pt transport', 'pt generator', 'kde', 'k-means', 'random', 'ot multi'], 'The generator is not recognized!'
-        assert distr in ['uniform', 'normal'], 'The random distribution is not recognized!'
+        assert distr in ['uniform', 'normal', 'multi'], 'The random distribution is not recognized!'
 
         self.weight_path = weight_path
         self.img_path = img_path
@@ -64,12 +67,69 @@ class GenerativeFramework():
             raise NotImplementedError
         elif dataset == 'lfw':
             raise NotImplementedError
+        elif dataset == 'toy_eight':
+            x_train = []
+            x_test = []
+
+            d = {0: (10, 0), 1: (10/sqrt(2), 10/sqrt(2)), 2: (0, 10), 3: (-10/sqrt(2), 10/sqrt(2)), \
+                 4: (-10, 0), 5: (-10/sqrt(2), -10/sqrt(2)), 6: (0, -10), 7: (10/sqrt(2), -10/sqrt(2))}
+
+            for i in range(60000):
+                noise = 0.1 * np.random.normal(size=2)
+                noisex = noise[0]
+                noisey = noise[1]
+                
+                center = d[i%8]
+                l = [center[0] + noisex, center[1] + noisey]
+                x_train.append(l)
+
+            for i in range(10000):
+                noise = 0.1 * np.random.normal(size=2)
+                noisex = noise[0]
+                noisey = noise[1]
+              
+                center = d[i%8]
+                l = [center[0] + noisex, center[1] + noisey]
+                x_test.append(l)
+
+            self.x_train = np.array(x_train)
+            self.x_test = np.array(x_test)
+        elif dataset == 'toy_two':
+            x_train = []
+            x_test = []
+
+            d = {0: (1, 0), 1: (-1, 0)}
+
+            for i in range(60000):
+                noise = 0.1 * np.random.normal(size=2)
+                noisex = noise[0]
+                noisey = noise[1]
+                
+                center = d[i%2]
+                l = [center[0] + noisex, center[1] + noisey]
+                x_train.append(l)
+
+            for i in range(10000):
+                noise = 0.05 * np.random.normal(size=2)
+                noisex = noise[0]
+                noisey = noise[1]
+              
+                center = d[i%2]
+                l = [center[0] + noisex, center[1] + noisey]
+                x_test.append(l)
+
+            self.x_train = np.array(x_train)
+            self.x_test = np.array(x_test)
 
         if autoencoder == 'dense':
             self.autoencoder = Autoencoder(weight_path, batch_size=batch_size, dim=dim, input_shape=shape)
         elif autoencoder == 'conv':
             self.autoencoder = ConvolutionalAutoencoder(weight_path, batch_size=batch_size, dim=dim, input_shape=shape)
         elif autoencoder == 'cond':
+            raise NotImplementedError
+        elif autoencoder == 'identity':
+            self.autoencoder = Identity()
+        else:
             raise NotImplementedError
         
         if generator == 'ot transport':
@@ -107,9 +167,9 @@ class GenerativeFramework():
     def save_autoencoder(self, file_name):
         self.autoencoder.save_weights(file_name)
 
-    def initialize_generator(self, recompute, file_inputs, file_answers): # TODO: Either switch everything to regular args or switch this to kwargs
+    def initialize_generator(self, recompute, file_inputs, file_answers, activation='sigmoid'): # TODO: Either switch everything to regular args or switch this to kwargs
     	encodings = self.autoencoder.encode(self.x_train) #Fix?
-    	self.generator.initialize(encodings, recompute, file_inputs, file_answers)
+    	self.generator.initialize(encodings, recompute, file_inputs, file_answers, activation=activation)
 
     def train_generator(self, **kwargs):
         self.generator.train(**kwargs)
