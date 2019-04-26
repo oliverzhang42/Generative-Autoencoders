@@ -23,30 +23,21 @@ def display(file_path):
 
 # Needs fixing
 
-def display_img(x, path, show=True, shape=(28, 28), single=False, index=0, labels=None, columns=4, channels_first=True):
-    if single:
-        if not channels_first:
-            img = np.moveaxis(x, 0, -1)
-        img = x.reshape(shape)
-        plt.figure()
+def display_img(x, path, show=True, shape=(28, 28), index=0, labels=None, columns=4, channels_first=True):
+    fig=plt.figure(figsize=(8, 8))
+    rows=len(x)//columns
+
+    for i in range(len(x)):
+        img = x[i]
+
+        if channels_first:
+            img = np.moveaxis(img, 0, -1)
+        
         if labels:
-            plt.title(labels)
+            plt.title(labels[i])
+        
+        fig.add_subplot(rows, columns, i+1)
         plt.imshow(img, cmap='gray')
-    else:
-        fig=plt.figure(figsize=(8, 8))
-        rows=len(x)//columns
-            
-        for i in range(len(x)):
-            if not channels_first:
-                img = x[i].reshape((shape[1], shape[2], shape[3]))
-                img = np.moveaxis(img, 0, -1)
-            else:
-                img = x[i].reshape(shape)
-            if labels:
-                plt.title(labels[i])
-            
-            fig.add_subplot(rows, columns, i+1)
-            plt.imshow(img, cmap='gray')
 
 #            if show:
 #                subs[i//columns][i%columns].imshow(img, cmap='gray')
@@ -172,7 +163,7 @@ def ot_compute_answers(inputs, encodings):
     M = ot.dist(inputs, encodings)
     M = np.array(M)
 
-    mapping = ot.emd(a, b, M)
+    mapping = ot.emd(a, b, M, numItermax=1000000)
 
     answers = []
       

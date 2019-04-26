@@ -1,4 +1,5 @@
 import argparse
+from copy import deepcopy
 
 import numpy as np
 
@@ -30,12 +31,22 @@ class Transporter():
 
         self.model = torch.nn.Sequential(
             torch.nn.Linear(self.dim, H),
+            #torch.nn.BatchNorm1D(H)
             torch.nn.LeakyReLU(),
             torch.nn.Linear(H, H),
+            #torch.nn.BatchNorm1D(H)
             torch.nn.LeakyReLU(),
             torch.nn.Linear(H, H),
+            #torch.nn.BatchNorm1D(H)
             torch.nn.LeakyReLU(),
             torch.nn.Linear(H, H),
+            #torch.nn.BatchNorm1D(H)
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(H, H),
+            #torch.nn.BatchNorm1D(H)
+            torch.nn.LeakyReLU(),
+            torch.nn.Linear(H, H),
+            #torch.nn.BatchNorm1D(H)
             torch.nn.LeakyReLU(),
             torch.nn.Linear(H, self.dim),
         )
@@ -78,3 +89,15 @@ class Transporter():
     def generate(self):
         inputs = self.distr.sample((self.batch_size, self.dim))
         return self.model(inputs).detach().cpu().numpy()
+
+    def interpolate(self, vec1, vec2, size):
+        increment = (vec1 - vec2) / size
+
+        current = deepcopy(vec1)
+        inputs = [deepcopy(current)]
+
+        for i in range(size):
+            current = current + increment
+            inputs.append(deepcopy(current))
+
+        return self.model(torch.Tensor(inputs)).detach().cpu().numpy()

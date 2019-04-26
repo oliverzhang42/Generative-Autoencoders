@@ -19,7 +19,7 @@ torch.set_default_tensor_type('torch.cuda.FloatTensor')
 class Generator(Transporter):
     def train(self, steps, lr=0.001, images=False):
         loss_fn = torch.nn.L1Loss()
-        optimizer = optim.Adam(self.model.parameters(), lr=lr)
+        optimizer = optim.Adam(self.model.parameters(), betas=[0.5,0.999], lr=lr)
 
         for i in range(steps):
             inputs = self.distr.sample((self.batch_size, self.dim))

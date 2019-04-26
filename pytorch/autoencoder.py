@@ -5,6 +5,8 @@ import numpy as np
 
 import os
 
+import math
+
 import torch
 import torch.autograd as autograd
 import torch.nn as nn
@@ -15,10 +17,7 @@ from utils import *
 torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
 class Autoencoder():
-    def __init__(self, inputs, test, dim=10, path='.', batch_size=512, extra_layers=1, conv=False):
-        ''' 
-        inputs is meant to keep its original shape.
-        '''
+    def __init__(self, img_shape, dim=10, path='.', batch_size=512, extra_layers=1, conv=False):
         if not os.path.isdir(path):
             print("Making folder at path: {}".format(path))
             os.mkdir(path)
@@ -26,17 +25,14 @@ class Autoencoder():
         self.batch_size = batch_size
         self.path = path
         self.dim = dim
-        self.inputs = torch.Tensor(inputs)
-        self.test = torch.Tensor(test)
-        self.img_shape = self.inputs.shape
+        self.img_shape = img_shape
 
         if conv:
-            self.input_shape = self.inputs.shape
+            self.input_shape = img_shape
             self.create_conv_model(extra_layers)
         else:
-            self.inputs = self.inputs.view((self.inputs.shape[0],-1))
-            self.test = self.test.view((self.test.shape[0],-1))
-            self.input_shape = self.inputs.shape
+            flatten = np.prod(img_shape)
+            self.input_shape = (flatten)
             self.create_model(extra_layers)
 
     def create_model(self, extra_layers):
@@ -45,7 +41,7 @@ class Autoencoder():
 
         encoder = []
 
-        encoder.append(nn.Linear(input_shape[1], H))
+        encoder.append(nn.Linear(input_shape[0], H))
         encoder.append(nn.LeakyReLU())
         encoder.append(nn.BatchNorm1d(H))
         for i in range(extra_layers):
@@ -66,7 +62,7 @@ class Autoencoder():
             decoder.append(nn.Linear(H, H))
             decoder.append(nn.LeakyReLU())
             decoder.append(nn.BatchNorm1d(H))
-        decoder.append(nn.Linear(H, input_shape[1]))
+        decoder.append(nn.Linear(H, input_shape[0]))
         decoder.append(nn.Sigmoid())
 
         self.decoder = nn.Sequential(*decoder)
@@ -77,92 +73,77 @@ class Autoencoder():
         )
 
     def create_conv_model(self, extra_layers):
-        # Assume we're going for Cifar10 (32x32)
+        # https://github.com/1Konny/WAE-pytorch/blob/master/model.py
 
         H = 512
         input_shape = self.input_shape
 
-        assert self.input_shape[2] == self.input_shape[3], "We assume the images are square. (Also, channels are first)"
-        sidelength = self.input_shape[2]
+        assert self.input_shape[1] == self.input_shape[2], "We assume the images are square. (Also, channels are first)"
+        sidelength = self.input_shape[1]
 
-        '''
-        encoder = []
-
-        encoder.append(nn.Conv2d(input_shape[1], 128, 3, padding=1)) #128x128
-        encoder.append(nn.BatchNorm2d(128))
-        encoder.append(nn.LeakyReLU())
-        encoder.append(nn.MaxPool2d(2)) #64x64
-        encoder.append(nn.Conv2d(64, 32, 3, padding=1)) #64x64
-        encoder.append(nn.BatchNorm2d(32))
-        encoder.append(nn.LeakyReLU())
-        encoder.append(nn.MaxPool2d(2)) #32x32
-        encoder.append(nn.Conv2d(32, 16, 3, padding=1)) #32x32
-        encoder.append(nn.BatchNorm2d(16))
-        encoder.append(nn.LeakyReLU())
-        encoder.append(nn.MaxPool2d(2)) #32x32
-
-        
-        encoder.append(View(self.batch_size,-1))
-        encoder.append(nn.Linear((sidelength//8)*(sidelength//8)*16, 128))
-        encoder.append(nn.LeakyReLU())
-        encoder.append(nn.Linear(128, self.dim))
-        encoder.append(nn.Sigmoid())
-
-        self.encoder = nn.Sequential(*encoder)
-
-        decoder = []
-
-        decoder.append(nn.Linear(self.dim, 128))
-        decoder.append(nn.LeakyReLU())
-        decoder.append(nn.Linear(128, (sidelength//8)*(sidelength//8)*16))
-        decoder.append(nn.LeakyReLU())
-        
-        decoder.append(View(self.batch_size, 16, (sidelength//8), (sidelength//8)))
-
-        decoder.append(nn.ConvTranspose2d(16, 32, 4, stride=2, padding=1))
-        decoder.append(nn.LeakyReLU())
-        decoder.append(nn.ConvTranspose2d(32, 64, 4, stride=2, padding=1))
-        decoder.append(nn.LeakyReLU())
-        decoder.append(nn.ConvTranspose2d(64, 64, 4, stride=2, padding=1))
-        decoder.append(nn.LeakyReLU())
-        decoder.append(nn.ConvTranspose2d(64, 3, 3, padding=1))
-        decoder.append(nn.Sigmoid())
-        
-        decoder.append(nn.Conv2d(32, 64, 3, padding=1)) #8x8
-        decoder.append(nn.BatchNorm2d(64))
-        decoder.append(nn.LeakyReLU())
-        decoder.append(nn.UpsamplingNearest2d(scale_factor=2))
-        decoder.append(nn.Conv2d(64, 128, 3, padding=1)) # 16x16
-        decoder.append(nn.BatchNorm2d(128))
-        decoder.append(nn.LeakyReLU())
-        decoder.append(nn.UpsamplingNearest2d(scale_factor=2))
-        decoder.append(nn.Conv2d(128, 128, 3, padding=1)) #32x32
-        decoder.append(nn.BatchNorm2d(64))
-        decoder.append(nn.LeakyReLU())
-        decoder.append(nn.Conv2d(128, 3, 3, padding=1)) #32x32
-        decoder.append(nn.BatchNorm2d(3))
-        decoder.append(nn.Sigmoid())
-
-        self.decoder = nn.Sequential(*decoder)
-        '''
+        self.encoder = nn.Sequential(
+            nn.Conv2d(3, 128, 4, 2, 1, bias=False),              # B,  128, 32, 32
+            nn.BatchNorm2d(128),
+            nn.ReLU(True),
+            nn.Conv2d(128, 256, 4, 2, 1, bias=False),             # B,  256, 16, 16
+            nn.BatchNorm2d(256),
+            nn.ReLU(True),
+            nn.Conv2d(256, 512, 4, 2, 1, bias=False),             # B,  512,  8,  8
+            nn.BatchNorm2d(512),
+            nn.ReLU(True),
+            nn.Conv2d(512, 1024, 4, 2, 1, bias=False),            # B, 1024,  4,  4
+            nn.BatchNorm2d(1024),
+            nn.ReLU(True),
+            View(-1, 1024*4*4),                                 # B, 1024*4*4
+            nn.Linear(1024*4*4, self.dim),                         # B, z_dim
+            nn.Sigmoid()
+        )
+        self.decoder = nn.Sequential(
+            nn.Linear(self.dim, 1024*8*8),                           # B, 1024*8*8
+            View(-1, 1024, 8, 8),                               # B, 1024,  8,  8
+            nn.ConvTranspose2d(1024, 512, 4, 2, 1, bias=False),   # B,  512, 16, 16
+            nn.BatchNorm2d(512),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(512, 256, 4, 2, 1, bias=False),    # B,  256, 32, 32
+            nn.BatchNorm2d(256),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(256, 128, 4, 2, 1, bias=False),    # B,  128, 64, 64
+            nn.BatchNorm2d(128),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(128, 3, 1),                       # B,   nc, 64, 64
+            nn.Sigmoid()
+        )
 
         self.model = nn.Sequential(
             self.encoder,
             self.decoder
         )
 
-        '''
+        #'''
 
 
-    def train(self, steps, lr=0.001, images=False):
+    def train(self, steps, inputs=None, test=None, input_load=None, test_load=None, lr=0.001, save_images=False):
         loss_fn = nn.MSELoss(reduction='sum')
         optimizer = optim.Adam(self.model.parameters(), betas=[0.5, 0.999], lr=lr)
 
+        input_gen = iter(input_load)
+        test_gen = iter(test_load)
+
         for i in range(steps):
+            if i == 15000:
+                optimizer = optim.Adam(self.model.parameters(), betas=[0.5, 0.999], lr=lr/2)
             # Train the Encoder via reconstruction MSE
 
-            indices = np.random.choice(range(len(self.inputs)), size=self.batch_size)
-            x_batch = self.inputs[indices]
+            if inputs is not None:
+                indices = np.random.choice(range(len(inputs)), size=self.batch_size)
+                x_batch = inputs[indices]
+            else:
+                try:
+                    x_batch = next(input_gen)[0].cuda()
+                except StopIteration:
+                    input_gen = iter(input_load)
+                    x_batch = next(input_gen)[0].cuda()
+
             
             pred = self.model(x_batch)
             loss_re = loss_fn(pred, x_batch)
@@ -171,40 +152,50 @@ class Autoencoder():
             optimizer.step()
 
             optimizer.zero_grad()
-
+            
+            del x_batch
+            del pred
+            
             if i % 100 == 0:
                 print("Training Step: {}, loss: {}".format(i, loss_re.detach().cpu().numpy() / self.batch_size))
 
-                test_indices = np.random.choice(range(len(self.test)), size=self.batch_size)
+                #'''
+                if test is not None:
+                    test_indices = np.random.choice(range(len(test)), size=self.batch_size)
+                    x_test = test[test_indices]
+                else:
+                    try:
+                        x_test = next(test_gen)[0].cuda()
+                    except StopIteration:
+                        test_gen = iter(test_load)
+                        x_test = next(test_gen)[0].cuda()
 
-                x_test = self.test[test_indices]
                 test_pred = self.model(x_test)
                 test_loss = loss_fn(test_pred, x_test)
 
                 print("Testing Step: {}, loss: {}".format(i, test_loss.detach().cpu().numpy() / self.batch_size))
 
-                if images:
-                    display_img(pred.detach().cpu().numpy()[0:16], self.path, show=False, shape=self.img_shape, channels_first=False, index=i//100)
-
                 del test_loss
-                del test_pred
                 del x_test
+                #'''
+
+                if save_images:
+                    display_img(test_pred.detach().cpu().numpy()[0:16], self.path, show=False, shape=self.img_shape, channels_first=True, index=i//100)
+
+                del test_pred
             
             del loss_re
-            del x_batch
-            del pred
+
             
-
-
         self.save_weights("autoencoder")
 
     def encode(self, data):
         data = torch.Tensor(data).cuda()
         encodings = []
 
-        data = data.view(self.input_shape)
+        data = data.view((len(data),) + self.input_shape)
 
-        for i in range(len(data)//self.batch_size):
+        for i in range(math.ceil(len(data)/self.batch_size)):
             x_batch = data[i*self.batch_size:(i+1)*self.batch_size]
             pred_batch = self.encoder(x_batch).detach().cpu().numpy()
 
@@ -219,7 +210,7 @@ class Autoencoder():
         data = torch.Tensor(data).cuda()
         decodings = []
 
-        for i in range(len(data)//self.batch_size):
+        for i in range(math.ceil(len(data)/self.batch_size)):
             x_batch = data[i*self.batch_size:(i+1)*self.batch_size]
             pred_batch = self.decoder(x_batch).detach().cpu().numpy()
 
