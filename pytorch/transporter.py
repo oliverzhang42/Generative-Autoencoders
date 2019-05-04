@@ -86,9 +86,19 @@ class Transporter():
 
         self.save_weights("transporter")
 
-    def generate(self):
-        inputs = self.distr.sample((self.batch_size, self.dim))
-        return self.model(inputs).detach().cpu().numpy()
+    def generate(self, num_batches = 1):
+        outputs = None
+
+        for i in range(num_batches):
+            inputs = self.distr.sample((self.batch_size, self.dim))
+            latent_vec = self.model(inputs).detach().cpu().numpy()
+
+            if outputs is None:
+                outputs = latent_vec
+            else:
+                outputs = np.concatenate((outputs, latent_vec), 0)
+
+        return outputs
 
     def interpolate(self, vec1, vec2, size):
         increment = (vec1 - vec2) / size

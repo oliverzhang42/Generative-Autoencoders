@@ -3,6 +3,8 @@
 import argparse
 import numpy as np
 
+from scipy import linalg
+
 #https://github.com/bioinf-jku/TTUR/blob/master/fid.py
 
 def calculate_activation_statistics(act):
@@ -80,7 +82,8 @@ def fid(act1, act2):
     return calculate_frechet_distance(mu1, sigma1, mu2, sigma2)
 
 if __name__ == "__main__":
-	parser = argparse.ArgumentParser()
+    import pudb; pudb.set_trace()
+    parser = argparse.ArgumentParser()
     parser.add_argument("path1")
     parser.add_argument("path2")
 

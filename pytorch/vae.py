@@ -107,7 +107,7 @@ class VAE(nn.Module):
         return self.decode(z), mu, logvar
 
 model = VAE()
-optimizer = optim.Adam(model.parameters(), lr=1e-3)
+optimizer = optim.Adam(model.parameters(), lr=3e-4)
 
 
 # Reconstruction + KL divergence losses summed over all elements and batch
@@ -163,11 +163,21 @@ def test(epoch):
     print('====> Test set loss: {:.4f}'.format(test_loss))
 
 if __name__ == "__main__":
+    model.load_state_dict(torch.load("vae_model"))
+
     for epoch in range(1, args.epochs + 1):
         train(epoch)
         test(epoch)
+        torch.save("vae_model", model.state_dict())
+
         with torch.no_grad():
-            sample = torch.randn(64, 100)
+            sample = torch.randn(100, 100)
             sample = model.decode(sample).cpu()
             save_image(sample.view(64, 3, 64, 64),
                        'results/sample_' + str(epoch) + '.png')
+
+    with torch.no_grad():
+        for i in range(100):
+            sample = torch.randn(100, 100)
+            sample = model.decode(sample).cpu()
+            torch.save("wae_images{}".format(i), sample)

@@ -32,6 +32,8 @@ def display_img(x, path, show=True, shape=(28, 28), index=0, labels=None, column
 
         if channels_first:
             img = np.moveaxis(img, 0, -1)
+
+        img = np.reshape(img, shape)
         
         if labels:
             plt.title(labels[i])

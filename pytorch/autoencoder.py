@@ -32,7 +32,7 @@ class Autoencoder():
             self.create_conv_model(extra_layers)
         else:
             flatten = np.prod(img_shape)
-            self.input_shape = (flatten)
+            self.input_shape = (flatten,)
             self.create_model(extra_layers)
 
     def create_model(self, extra_layers):
@@ -42,12 +42,12 @@ class Autoencoder():
         encoder = []
 
         encoder.append(nn.Linear(input_shape[0], H))
-        encoder.append(nn.LeakyReLU())
         encoder.append(nn.BatchNorm1d(H))
+        encoder.append(nn.LeakyReLU())
         for i in range(extra_layers):
             encoder.append(nn.Linear(H, H))
-            encoder.append(nn.LeakyReLU())
             encoder.append(nn.BatchNorm1d(H))
+            encoder.append(nn.LeakyReLU())
         encoder.append(nn.Linear(H, self.dim))
         encoder.append(nn.Sigmoid())
         
@@ -56,12 +56,12 @@ class Autoencoder():
         decoder = []
 
         decoder.append(nn.Linear(self.dim, H))
-        decoder.append(nn.LeakyReLU())
         decoder.append(nn.BatchNorm1d(H))
+        decoder.append(nn.LeakyReLU())
         for i in range(extra_layers):
             decoder.append(nn.Linear(H, H))
-            decoder.append(nn.LeakyReLU())
             decoder.append(nn.BatchNorm1d(H))
+            decoder.append(nn.LeakyReLU())
         decoder.append(nn.Linear(H, input_shape[0]))
         decoder.append(nn.Sigmoid())
 
@@ -96,7 +96,7 @@ class Autoencoder():
             nn.ReLU(True),
             View(-1, 1024*4*4),                                 # B, 1024*4*4
             nn.Linear(1024*4*4, self.dim),                         # B, z_dim
-            nn.Sigmoid()
+            #nn.Sigmoid()
         )
         self.decoder = nn.Sequential(
             nn.Linear(self.dim, 1024*8*8),                           # B, 1024*8*8
@@ -126,8 +126,9 @@ class Autoencoder():
         loss_fn = nn.MSELoss(reduction='sum')
         optimizer = optim.Adam(self.model.parameters(), betas=[0.5, 0.999], lr=lr)
 
-        input_gen = iter(input_load)
-        test_gen = iter(test_load)
+        if inputs is None:
+            input_gen = iter(input_load)
+            test_gen = iter(test_load)
 
         for i in range(steps):
             if i == 15000:
@@ -136,7 +137,8 @@ class Autoencoder():
 
             if inputs is not None:
                 indices = np.random.choice(range(len(inputs)), size=self.batch_size)
-                x_batch = inputs[indices]
+                x_batch = torch.Tensor(inputs[indices])
+                x_batch = x_batch.view((-1,) + self.input_shape)
             else:
                 try:
                     x_batch = next(input_gen)[0].cuda()
@@ -162,7 +164,8 @@ class Autoencoder():
                 #'''
                 if test is not None:
                     test_indices = np.random.choice(range(len(test)), size=self.batch_size)
-                    x_test = test[test_indices]
+                    x_test = torch.Tensor(test[test_indices])
+                    x_test = x_test.view((-1,) + self.input_shape)
                 else:
                     try:
                         x_test = next(test_gen)[0].cuda()
