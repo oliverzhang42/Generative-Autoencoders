@@ -1,105 +1,83 @@
+from math import *
 import numpy as np
 import ot
 import os
 import matplotlib.pyplot as plt
 from sklearn import datasets
 import torch
-from math import *
 
 plt.rcParams["figure.figsize"] = [9.0, 6.0]
 plt.rcParams["axes.grid"] = False
 
 def one_hot(labels, num_classes):
-    """
-    https://discuss.pytorch.org/t/convert-int-into-one-hot-format/507/25
-    """
+    '''
+    Converts labels to one_hot encoding.
+    '''
     y = torch.eye(num_classes) 
     return y[labels]
 
-def display(file_path):
-    images = np.load(file_path)
-    indices = np.random.choice(range(len(images)), size=16)
-    display_img(images[indices])
+def display_img(x, columns=4):
+    '''
+    Displays images in a grid using matplotlib
 
-# Needs fixing
-
-def display_img(x, path, show=True, shape=(28, 28), index=0, labels=None, columns=4, channels_first=True):
-    fig=plt.figure(figsize=(8, 8))
+    x: numpy array containing images to display.
+    Must be formatted channels back.
+    '''
     rows=len(x)//columns
+    fig=plt.figure(figsize=(rows, columns))
 
     for i in range(len(x)):
         img = x[i]
 
-        if channels_first:
-            img = np.moveaxis(img, 0, -1)
-
-        img = np.reshape(img, shape)
-        
-        if labels:
-            plt.title(labels[i])
-        
         fig.add_subplot(rows, columns, i+1)
         plt.imshow(img, cmap='gray')
 
-#            if show:
-#                subs[i//columns][i%columns].imshow(img, cmap='gray')
-    
-    if show:
-        plt.show()
-    else:
-        file_path = os.path.join(path, "image{}.png".format(index))
-        fig.savefig(file_path)
-        fig.clf()
-        plt.close(fig)
+    plt.show()
 
-def display_points(inputs, answers, path, show=True, index=0, lines=False):
+def save_points(inputs, answers, path, index=0, lines=False):
+    '''
+    Saves an img of points in a scatterplot using matplotlib
+
+    inputs: (list or np array) Points to plot
+    answers: (list or np array) Points to plot
+    path: (str) Where to save the points
+    index: (int) Used to name the image
+    lines: (bool) Whether to draw lines from inputs[i] to answers[i]
+    '''
     plt.scatter(inputs[:,0], inputs[:,1], color='blue')
     plt.scatter(answers[:,0], answers[:,1], color='green')
 
-    for i in range(512):
-        if lines:
+    if lines:
+        for i in range(512):
             plt.plot([inputs[i][0], answers[i][0]], [inputs[i][1], answers[i][1]], color='red')
-    
-    if show:
-        plt.show()
-    else:
-        file_path = os.path.join(path, "image{}.png".format(index))
-        plt.savefig(file_path)
-        plt.clf()
 
-def make_moons(train=60000, test=10000, noise=0.05, shuffle=True):
+    file_path = os.path.join(path, "image{}.png".format(index))
+    plt.savefig(file_path)
+    plt.clf()
+
+def make_moons(train=60000, test=10000, noise=0.05):
+    '''
+    Makes the moons datasets. See
+    https://scikit-learn.org/stable/modules/generated/sklearn.datasets.make_moons.html
+    '''
     moons_train, train_labels = datasets.make_moons(n_samples=train, noise=noise)
     moons_test, test_labels = datasets.make_moons(n_samples=test, noise=noise)
-
-    if not shuffle:
-        moons_train1 = []
-        moons_train2 = []
-
-        for i in range(len(moons_train)):
-            if train_labels[i] == 0:
-                moons_train1.append(moons_train[i])
-            else:
-                moons_train2.append(moons_train[i])
-
-        moons_test1 = []
-        moons_test2 = []
-
-        for i in range(len(moons_test)):
-            if train_labels[i] == 0:
-                moons_test1.append(moons_test[i])
-            else:
-                moons_test2.append(moons_test[i])
-
-        return np.concatenate((moons_train1, moons_train2)), np.concatenate((moons_test1, moons_test2))
-
     return moons_train, moons_test
 
 def make_circles(train=60000, test=10000, noise=0.05):
+    '''
+    Makes the circles datasets. See
+    https://scikit-learn.org/stable/modules/generated/sklearn.datasets.make_circles.html
+    '''
     moon_train, _ = datasets.make_circles(n_samples=train, noise=noise, factor=0.5)
     moon_test, _ = datasets.make_circles(n_samples=test, noise=noise, factor=0.5)
     return moon_train, moon_test
 
-def toy_two(train=60000, test=10000, noise_scale=0.1):
+def two_custer(train=60000, test=10000, noise_scale=0.1):
+    '''
+    Makes a toy dataset with two clusters. Clusters are centered
+    at (1,0), (-1,0), are normal, and have a stdev = noise_scale.
+    '''
     d = {0: (1, 0), 1: (-1, 0)}
 
     x_train = []
@@ -125,7 +103,12 @@ def toy_two(train=60000, test=10000, noise_scale=0.1):
 
     return np.array(x_train), np.array(x_test)
 
-def toy_eight(train=60000, test=10000, noise_scale=0.1):
+def eight_cluster(train=60000, test=10000, noise_scale=0.1):
+    '''
+    Makes a toy dataset with eight clusters. Clusters are centered
+    evenly around the origin two away from it. Clusters are normal
+    and stdev of clusters = noise_scale
+    '''
     x_train = []
     x_test = []
 
@@ -152,9 +135,12 @@ def toy_eight(train=60000, test=10000, noise_scale=0.1):
 
     return np.array(x_train), np.array(x_test)
 
-def ot_compute_answers(inputs, encodings):
+def optimal_transport(inputs, encodings):
     '''
     Computes optimal transport for one batch.
+
+    inputs (np array): Inputs of the optimal transport mapping
+    encodings (np array): Outputs of the optimal transport mapping
     '''
 
     batch_size = len(inputs)
@@ -178,18 +164,13 @@ def ot_compute_answers(inputs, encodings):
     return answers
 
 class View(torch.nn.Module):
+    '''
+    With this, we can reshape tensors from within
+    the middle of a Sequential object
+    '''
     def __init__(self, *args):
         super(View, self).__init__()
         self.shape = args
 
     def forward(self, x):
         return x.view(self.shape)
-
-def show_obj():
-    import gc
-    for obj in gc.get_objects():
-        try:
-            if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
-                print(type(obj), obj.size())
-        except:
-            pass

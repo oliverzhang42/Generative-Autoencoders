@@ -1,23 +1,33 @@
-import argparse
-from  keras.datasets import mnist, fashion_mnist
-
-import numpy as np
-
-import os
-
+from keras.datasets import mnist, fashion_mnist
 import math
+import numpy as np
+import os
 
 import torch
 import torch.autograd as autograd
 import torch.nn as nn
 import torch.optim as optim
+from torchvision.utils import save_images
 
 from utils import *
 
 torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
+'''
+Autoencoder class. Contains an autoencoder made via pytorch. This autoencoder
+can either be convolution or not.
+'''
 class Autoencoder():
-    def __init__(self, img_shape, dim=10, path='.', batch_size=512, extra_layers=1, conv=False):
+    def __init__(self, img_shape, dim=10, path='.', batch_size=512, conv=False):
+        '''
+        Constructor of Autoencoder.
+
+        img_shape: (tuple) The shape of the image. Channels first.
+        dim: (int) The dimension of the bottleneck layer of the autoencoder.
+        path: (str) The path to store all weights/images
+        batch_size: (int) batch size
+        conv: (bool) Whether we're using the convolutional model or not.
+        '''
         if not os.path.isdir(path):
             print("Making folder at path: {}".format(path))
             os.mkdir(path)
@@ -29,56 +39,73 @@ class Autoencoder():
 
         if conv:
             self.input_shape = img_shape
-            self.create_conv_model(extra_layers)
+            self.create_conv_model()
         else:
             flatten = np.prod(img_shape)
             self.input_shape = (flatten,)
-            self.create_model(extra_layers)
+            self.create_model()
 
-    def create_model(self, extra_layers):
+    def create_model(self):
+        '''
+        Creates a pytorch autoencoder model stored under self.model.
+        
+        We use 3 layers in each of the encoder and decoder, and a hidden layer
+        neuron size of 512. BatchNorm and LeakyReLU are also used as well as a
+        Sigmoid activation at the end of each of the encoder and decoder.
+        '''
+
         H = 512
         input_shape = self.input_shape
 
+        # Create the encoder
         encoder = []
 
         encoder.append(nn.Linear(input_shape[0], H))
         encoder.append(nn.BatchNorm1d(H))
         encoder.append(nn.LeakyReLU())
-        for i in range(extra_layers):
-            encoder.append(nn.Linear(H, H))
-            encoder.append(nn.BatchNorm1d(H))
-            encoder.append(nn.LeakyReLU())
+        encoder.append(nn.Linear(H, H))
+        encoder.append(nn.BatchNorm1d(H))
+        encoder.append(nn.LeakyReLU())
         encoder.append(nn.Linear(H, self.dim))
         encoder.append(nn.Sigmoid())
         
         self.encoder = nn.Sequential(*encoder)
 
+        # Create the decoder
         decoder = []
 
         decoder.append(nn.Linear(self.dim, H))
         decoder.append(nn.BatchNorm1d(H))
         decoder.append(nn.LeakyReLU())
-        for i in range(extra_layers):
-            decoder.append(nn.Linear(H, H))
-            decoder.append(nn.BatchNorm1d(H))
-            decoder.append(nn.LeakyReLU())
+        decoder.append(nn.Linear(H, H))
+        decoder.append(nn.BatchNorm1d(H))
+        decoder.append(nn.LeakyReLU())
         decoder.append(nn.Linear(H, input_shape[0]))
         decoder.append(nn.Sigmoid())
 
         self.decoder = nn.Sequential(*decoder)
-
+ 
+        # Finalize the autoencoder
         self.model = nn.Sequential(
             self.encoder,
             self.decoder
         )
 
-    def create_conv_model(self, extra_layers):
-        # https://github.com/1Konny/WAE-pytorch/blob/master/model.py
+    def create_conv_model(self):
+        '''
+        Creates a pytorch convolutional autoencoder model and stores it under
+        self.model. This conv model has the same architecture as in the paper
+        "Wasserstein Autoencoders" by Tolstikhin et al.
+
+        Code is taken from:
+        https://github.com/1Konny/WAE-pytorch/blob/master/model.py 
+        '''
 
         H = 512
         input_shape = self.input_shape
 
-        assert self.input_shape[1] == self.input_shape[2], "We assume the images are square. (Also, channels are first)"
+        assert self.input_shape[1] == self.input_shape[2], \
+            "We assume the images are square. (Also, channels are first)"
         sidelength = self.input_shape[1]
 
         self.encoder = nn.Sequential(
@@ -119,40 +146,108 @@ class Autoencoder():
             self.decoder
         )
 
-        #'''
+    def train(self, steps, inputs, test, lr=0.001):
+        '''
+        Train the autoencoder using the data formatted directly in a numpy 
+        array. (No iteraters or anything)
 
-
-    def train(self, steps, inputs=None, test=None, input_load=None, test_load=None, lr=0.001, save_images=False):
+        steps: (int) The number of iterations to do.
+        inputs: (np array) The data to train your autoencoder on.
+        test: (np array) The data to test your autoencoder on.
+        lr: (int) Learning rate of the autoencoder
+        '''
         loss_fn = nn.MSELoss(reduction='sum')
         optimizer = optim.Adam(self.model.parameters(), betas=[0.5, 0.999], lr=lr)
 
-        if inputs is None:
-            input_gen = iter(input_load)
-            test_gen = iter(test_load)
-
         for i in range(steps):
+            # Half way through, half the learning rate
             if i == 15000:
                 optimizer = optim.Adam(self.model.parameters(), betas=[0.5, 0.999], lr=lr/2)
-            # Train the Encoder via reconstruction MSE
-
-            if inputs is not None:
-                indices = np.random.choice(range(len(inputs)), size=self.batch_size)
-                x_batch = torch.Tensor(inputs[indices])
-                x_batch = x_batch.view((-1,) + self.input_shape)
-            else:
-                try:
-                    x_batch = next(input_gen)[0].cuda()
-                except StopIteration:
-                    input_gen = iter(input_load)
-                    x_batch = next(input_gen)[0].cuda()
-
             
+            # Pick a batch to train on
+            indices = np.random.choice(len(inputs), size=self.batch_size)
+            x_batch = torch.Tensor(inputs[indices])
+            x_batch = x_batch.view((-1,) + self.input_shape)
+
+            # Calculate reconstruction loss
             pred = self.model(x_batch)
             loss_re = loss_fn(pred, x_batch)
-
             loss_re.backward()
-            optimizer.step()
 
+            optimizer.step()
+            optimizer.zero_grad()
+            
+            del x_batch
+            del pred
+            
+            # Every 100 iterations, test on a batch
+            if i % 100 == 0:
+                print("Training Step: {}, loss: {}".format(i, \
+                    loss_re.detach().cpu().numpy() / self.batch_size))
+
+                # Pick a batch to test on
+                test_indices = np.random.choice(range(len(test)), size=self.batch_size)
+                x_test = torch.Tensor(test[test_indices])
+                x_test = x_test.view((-1,) + self.input_shape)
+                
+                # Calculate reconstruction loss
+                test_pred = self.model(x_test)
+                test_loss = loss_fn(test_pred, x_test)
+
+                print("Testing Step: {}, loss: {}".format(i, \
+                    test_loss.detach().cpu().numpy() / self.batch_size))
+
+                del test_loss
+                del x_test
+                
+                # Every 1000 iterations, save 64 images to see how the autoencoder 
+                # is doing.
+                if i % 1000 == 0:
+                    test_imgs = test_pred.detach().cpu().numpy()[0:64]
+                    save_images(test_imgs.view((64,) + self.img_shape), \
+                        self.path + str(i) + '.png')
+
+                    del test_imgs
+                
+                del test_pred
+            
+            del loss_re
+            
+        self.save_weights("autoencoder")
+
+    def train_iter(self, steps, input_load, test_load, lr=0.001):
+        '''
+        Train the autoencoder using the data formatted in a torch DataLoader.
+
+        steps: (int) The number of iterations
+        input_load: (torch DataLoader) The data you want to train your autoencoder on
+        test_load: (torch DataLoader) The data you want to test your autoencoder on
+        lr: (int) learning rate
+        '''
+        loss_fn = nn.MSELoss(reduction='sum')
+        optimizer = optim.Adam(self.model.parameters(), betas=[0.5, 0.999], lr=lr)
+
+        input_gen = iter(input_load)
+        test_gen = iter(test_load)
+
+        for i in range(steps):
+            # Half way through, half the learning rate
+            if i == 15000:
+                optimizer = optim.Adam(self.model.parameters(), betas=[0.5, 0.999], lr=lr/2)
+            
+            # Get next batch. If you've run out of batches, restart the DataLoader
+            try:
+                x_batch = next(input_gen)[0].cuda()
+            except StopIteration:
+                input_gen = iter(input_load)
+                x_batch = next(input_gen)[0].cuda()
+            
+            # Calculate Reconstruction Loss
+            pred = self.model(x_batch)
+            loss_re = loss_fn(pred, x_batch)
+            loss_re.backward()
+
+            optimizer.step()
             optimizer.zero_grad()
             
             del x_batch
@@ -161,38 +256,44 @@ class Autoencoder():
             if i % 100 == 0:
                 print("Training Step: {}, loss: {}".format(i, loss_re.detach().cpu().numpy() / self.batch_size))
 
-                #'''
-                if test is not None:
-                    test_indices = np.random.choice(range(len(test)), size=self.batch_size)
-                    x_test = torch.Tensor(test[test_indices])
-                    x_test = x_test.view((-1,) + self.input_shape)
-                else:
-                    try:
-                        x_test = next(test_gen)[0].cuda()
-                    except StopIteration:
-                        test_gen = iter(test_load)
-                        x_test = next(test_gen)[0].cuda()
+                # Get next batch. If you've run out of batches, restart the DataLoader
+                try:
+                    x_test = next(test_gen)[0].cuda()
+                except StopIteration:
+                    test_gen = iter(test_load)
+                    x_test = next(test_gen)[0].cuda()
 
+                # Test Reconstruction Loss
                 test_pred = self.model(x_test)
                 test_loss = loss_fn(test_pred, x_test)
 
-                print("Testing Step: {}, loss: {}".format(i, test_loss.detach().cpu().numpy() / self.batch_size))
+                print("Testing Step: {}, loss: {}".format(i, \
+                    test_loss.detach().cpu().numpy() / self.batch_size))
 
                 del test_loss
                 del x_test
-                #'''
+                
+                # Every 1000 iterations, save 64 images to see how the autoencoder 
+                # is doing.
+                if i % 1000 == 0:
+                    test_imgs = test_pred.detach().cpu().numpy()[0:64]
+                    save_images(test_imgs.view((64,) + self.img_shape), \
+                        self.path + str(i) + '.png')
 
-                if save_images:
-                    display_img(test_pred.detach().cpu().numpy()[0:16], self.path, show=False, shape=self.img_shape, channels_first=True, index=i//100)
-
+                    del test_imgs
+                
                 del test_pred
             
             del loss_re
-
             
         self.save_weights("autoencoder")
 
     def encode(self, data):
+        '''
+        Use the autoencoder to encode some data.
+
+        data: (np array) The data to encode.
+        '''
         data = torch.Tensor(data).cuda()
         encodings = []
 
@@ -210,6 +311,11 @@ class Autoencoder():
         return encodings
 
     def decode(self, data):
+        '''
+        Use the autoencoder to decode some data.
+
+        data: (np array) The data to decode.
+        '''
         data = torch.Tensor(data).cuda()
         decodings = []
 
@@ -234,10 +340,7 @@ class Autoencoder():
 
     def evaluate(self, x_test):
         loss = self.autoencoder.evaluate(x_test, x_test)
-
-        print("Evaluating the Autoencoder. Loss:")
-        print(loss)
-
+        print("Evaluating the Autoencoder. Loss: {}".format(loss))
         return loss
 
 # WIP I guess...

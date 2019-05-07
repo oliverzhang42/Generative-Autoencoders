@@ -1,95 +1,140 @@
 import argparse
 from copy import deepcopy
-
 import numpy as np
-
 import os
 
 import torch
 import torch.autograd as autograd
 import torch.nn as nn
 import torch.optim as optim
-from torch.distributions import uniform
+from torch.distributions import uniform, normal
 
 from utils import *
 
 torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
+'''
+Transporter Class. Uses optimal transport to learn the mapping from
+a noise distribution to some latent space distribution.
+'''
 class Transporter():
-    def __init__(self, inputs, dim, path='.', batch_size=512):
-        self.inputs = torch.Tensor(inputs)
-        self.path = path
-        self.dim = dim
-        self.batch_size = batch_size
+    def __init__(self, latent, noise='uniform', path='.', batch_size=512):
+        '''
+        Initializes the Transporter, including creating the model.
 
-        self.distr = uniform.Uniform(-1, 1)
+        latent: (np array) Latent space distribution to map to. Must be an
+        array of one dimensional vectors.
+        noise: (str) Noise distribution to map from. Must be either 'uniform',
+        'normal', or 'gaussian'
+        path: (str) Path to store any images/weights of the model
+        batch_size: (int) Batch Size
+        '''
+        self.latent = torch.Tensor(latent)
+        self.dim = len(latent[0])
+
+        if noise.lower() == 'uniform':
+            self.noise = uniform.Uniform(-1, 1)
+        elif noise.lower() == 'normal' or noise.lower() == 'gaussian':
+            self.noise = normal.Normal(0, 1)
+        else:
+            raise Exception("{} has not been implemented yet".format(noise))
+
+        self.path = path
+        self.batch_size = batch_size
 
         self.create_model()
 
     def create_model(self):
+        '''
+        Creates a model of 7 fully connected layers with LeakyReLU activation.
+        All layers but last have 512 neurons.
+        '''
         H = 512
 
         self.model = torch.nn.Sequential(
             torch.nn.Linear(self.dim, H),
-            #torch.nn.BatchNorm1D(H)
             torch.nn.LeakyReLU(),
             torch.nn.Linear(H, H),
-            #torch.nn.BatchNorm1D(H)
             torch.nn.LeakyReLU(),
             torch.nn.Linear(H, H),
-            #torch.nn.BatchNorm1D(H)
             torch.nn.LeakyReLU(),
             torch.nn.Linear(H, H),
-            #torch.nn.BatchNorm1D(H)
             torch.nn.LeakyReLU(),
             torch.nn.Linear(H, H),
-            #torch.nn.BatchNorm1D(H)
             torch.nn.LeakyReLU(),
             torch.nn.Linear(H, H),
-            #torch.nn.BatchNorm1D(H)
             torch.nn.LeakyReLU(),
             torch.nn.Linear(H, self.dim),
         )
 
     def save_weights(self, name):
+        '''
+        Weights saved under self.path defined above.
+        '''
         full_path = os.path.join(self.path, name)
         torch.save(self.model.state_dict(), full_path)
 
     def load_weights(self, name):
+        '''
+        Weights saved under self.path defined above.
+        '''
         full_path = os.path.join(self.path, name)
         self.model.load_state_dict(torch.load(full_path))
 
     def train(self, steps, lr=0.001, images=False):
+        '''
+        Train transporter using optimal transport for any number of iterations.
+
+        steps: (int) Number of iterations to train
+        lr: (int) Learning Rate
+        images: (bool) True means images will be stored under self.path, False
+        means they will not
+        '''
+        print("Beginning Transporter Training!")
+
         loss_fn = torch.nn.L1Loss()
-        optimizer = optim.Adam(self.model.parameters(), lr=lr)
+        optimizer = optim.Adam(self.model.parameters(), betas=[0.5,0.999], lr=lr)
 
         for i in range(steps):
-            inputs = self.distr.sample((self.batch_size, self.dim))
+            # Samples inputs from noise distribution
+            inputs = self.noise.sample((self.batch_size, self.dim))
 
-            indices = np.random.choice(range(len(self.inputs)), size=self.batch_size)
-            real_vecs = self.inputs[indices]
+            # Samples latent distribution
+            indices = np.random.choice(len(self.inputs), size=self.batch_size)
+            real_vecs = self.latent[indices]
 
-            answer_indices = ot_compute_answers(inputs.cpu().numpy(), real_vecs.cpu().numpy())
+            # Computes optimal transport from inputs to latent. answers[i] will 
+            # be the latent vector that inputs[i] should be mapped to.
+            answer_indices = optimal_transport(inputs.cpu().numpy(), real_vecs.cpu().numpy())
             answers = real_vecs[answer_indices]
 
-            generated =self.model(inputs)
+            generated = self.model(inputs)
 
             loss = loss_fn(generated, answers)
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
 
-            print(loss.item())
+            if i % 100 == 0:
+                print("Loss at step {}: {}".format(i, loss.item()))
             
-            if i % 100 == 0 and images:
-                display_points(generated.detach().cpu(), answers.cpu(), self.path, show=False, index=i)
+            if images and i % 1000 == 0:
+                save_points(generated.detach().cpu(), answers.cpu(), self.path, index=i)
 
+        print("Saving Transporter Weights...")
         self.save_weights("transporter")
 
-    def generate(self, num_batches = 1):
+    def generate(self, batches=1):
+        '''
+        Generate realistic latent vectors by sampling noise and using the
+        model to map them.
+
+        batches: (int) The number of batches of realistic latent vectors to 
+        generate.
+        '''
         outputs = None
 
-        for i in range(num_batches):
+        for i in range(batches):
             inputs = self.distr.sample((self.batch_size, self.dim))
             latent_vec = self.model(inputs).detach().cpu().numpy()
 
@@ -100,8 +145,15 @@ class Transporter():
 
         return outputs
 
-    def interpolate(self, vec1, vec2, size):
-        increment = (vec1 - vec2) / size
+    def interpolate(self, vec1, vec2, intermediate):
+        '''
+        Interpolate between two noise vectors.
+
+        vec1: (np array) First noise vector
+        vec2: (np array) Second noise vector
+        intermediate: (int) Number of intermediate steps when interpolating.
+        '''
+        increment = (vec1 - vec2) / intermediate
 
         current = deepcopy(vec1)
         inputs = [deepcopy(current)]

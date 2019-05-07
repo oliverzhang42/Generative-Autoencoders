@@ -1,20 +1,30 @@
 # Script
+'''
+Things to Fix:
+1. display_image (whether it's flat or not, whether to roll axis or not)
+(also all usages of display_image) (DONE)
+2. Encoder and decode, how to deal with loaders (DONE)
+3. GPU if you have one, otherwise, no GPU 
+4. turn main into an argument taking thing
+5. Check how to store checkpoints and how to store images well
+6. Interpolation better
+7. Have presets for MNIST and CelebA for instance
+'''
 
 from autoencoder import Autoencoder
+from copy import deepcopy
 from generator import Generator
-from transporter import Transporter
-
 from keras.datasets import mnist, fashion_mnist, cifar10
+import os
+
 from torchvision import transforms
 import torchvision
 from torchvision.utils import save_image
 from torch.distributions import normal, uniform
 
-
+from transporter import Transporter
 from utils import *
-import os
 
-from copy import deepcopy
 
 torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
