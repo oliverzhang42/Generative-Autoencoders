@@ -1,16 +1,3 @@
-# Script
-'''
-Things to Fix:
-1. display_image (whether it's flat or not, whether to roll axis or not)
-(also all usages of display_image) (DONE)
-2. Encoder and decode, how to deal with loaders (DONE)
-3. GPU if you have one, otherwise, no GPU 
-4. turn main into an argument taking thing
-5. Check how to store checkpoints and how to store images well
-6. Interpolation better
-7. Have presets for MNIST and CelebA for instance
-'''
-
 import argparse
 from autoencoder import Autoencoder
 from copy import deepcopy
