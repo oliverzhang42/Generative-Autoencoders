@@ -11,6 +11,7 @@ Things to Fix:
 7. Have presets for MNIST and CelebA for instance
 '''
 
+import argparse
 from autoencoder import Autoencoder
 from copy import deepcopy
 from generator import Generator
@@ -28,16 +29,54 @@ from utils import *
 
 torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
-PATH = '/data/home/oliver/git/generative_autoencoders/pytorch'
-FOLDER = os.path.join(PATH, "mnist_30_g_2")
-DATASET = 'mnist'
-DIM = 30
-EXTRA_LAYERS = 1
-BATCH_SIZE = 128
-AE_STEPS = 30000
-STEPS = 30000
-MODEL = 'generator'
-CONV = False
+parser = argparse.ArgumentParser()
+
+parser.add_argument('--cuda', type=bool, action='store_true', default=True,
+                    help='enables CUDA training')
+parser.add_argument('--dataset', default='mnist',
+                    help='dataset name (default: mnist)')
+parser.add_argument('--folder', default='.',
+                    help='folder name to put everything in')
+
+parser.add_argument('--steps_a', type=int, default=15000,
+                    help='number of steps to take (default: 15000)')
+parser.add_argument('--batchsize_a', type=int, default=128,
+                    help='input batch size for autoencoder (default: 128)')
+parser.add_argument('--conv', type=bool, default=False,
+                    help='Is your autoencoder convolutional (default: false)')
+parser.add_argument('--dim', type=int, default=30,
+                    help='dimension of autoencoder (default: 30)')
+parser.add_argument('--extra-layers', type=int, default=1,
+                    help='Extra layers in the autoencoder (default: 1)')
+parser.add_argument('--load_a', type=bool, default=False,
+                    help='Whether to load the autoencoder (default: False)')
+
+parser.add_argument('--batchsize_l', type=int, default=128,
+                    help='input batch size for the latent space model (default: 128)')
+parser.add_argument('--load_l', type=bool, default=False,
+                    help='Whether to load the latent space model (default: False)')
+parser.add_argument('--steps_l', type=int, default=15000,
+                    help='number of steps your latent space model takes (default: 15000)')
+parser.add_argument('--model', default='generator',
+                    help='Is your latent space model a transporter or a generator (default: generator)')
+
+args = parser.parse_args()
+
+CUDA = args.cuda
+DATASET = args.dataset
+FOLDER = args.folder
+
+AE_STEPS = args.steps_a
+BATCH_SIZE = args.batchsize_a
+CONV = args.conv
+DIM = args.dim
+EXTRA_LAYERS = args.extra-layers
+AE_LOAD = args.load_a
+
+BATCH_SIZE_GEN = args.batchsize_l
+GEN_LOAD = args.load_l
+STEPS = args.steps_l
+MODEL = args.model
 
 import pudb; pudb.set_trace()
 
@@ -78,105 +117,32 @@ else:
 
 
 ae = Autoencoder(shape, DIM, FOLDER, BATCH_SIZE, EXTRA_LAYERS, CONV)
-ae.load_weights("autoencoder")
-'''
-if "x_train" in locals():
-    ae.train(AE_STEPS, inputs=x_train, test=x_test, lr=0.003, save_images=True)
+if AE_LOAD:
+    ae.load_weights("autoencoder")
 else:
-    ae.train(AE_STEPS, input_load=train_loader, test_load=test_loader, lr=0.003, save_images=True)
+    if "x_train" in locals():
+        ae.train(AE_STEPS, inputs=x_train, test=x_test, lr=0.003, save_images=True)
+    else:
+        ae.train(AE_STEPS, input_load=train_loader, test_load=test_loader, lr=0.003, save_images=True)
 
-#'''
 if not 'x_test' in locals():
-    test_iter = iter(test_loader)
-    x_test = next(test_iter)[0].numpy()
+    x_test = unload(test_loader)
 
-    while True:
-        try:
-            test_batch = next(test_iter)[0].numpy()
-            x_test = np.concatenate((x_test, test_batch), 0)
-        except StopIteration:
-            break
-#'''
-#'''
 encodings = ae.encode(x_test)
-#np.save("real_encodings", encodings)
-#encodings = ae.encode(np.load("wae_img.npy"))
-#np.save("wae_encodings", encodings)
-#encodings = ae.encode(np.load("otgen_img.npy"))
-#np.save("otgen_encodings", encodings)
-
-
-
-#ae_img = ae.decode(encodings)
-#display_img(x_test[0:16], PATH, shape=shape, channels_first=False)
-#display_img(ae_img[0:16], PATH, shape=shape, channels_first=False)
 
 if MODEL == 'transporter':
-    model = Transporter(encodings, DIM, FOLDER, 128)
+    model = Transporter(encodings, DIM, FOLDER, BATCH_SIZE_GEN)
 elif MODEL == 'generator':
-    model = Generator(encodings, DIM, FOLDER, 128)
+    model = Generator(encodings, DIM, FOLDER, BATCH_SIZE_GEN)
 else:
     raise NotImplementedError
 
-model.load_weights(MODEL)
-#model.train(STEPS, lr=0.0001)
+if GEN_LOAD:
+    model.load_weights(MODEL)
+else:
+    model.train(STEPS, lr=0.0001)
 
-#fake_distr = model.generate(num_batches=1)
-#generated_images = ae.decode(fake_distr)
-
-#np.save("ottrans_img", generated_images)
-
-'''
-m1 = uniform.Uniform(-1, 1)
-
-for k in range(100):
-    noise = m1.sample((9,100)).cpu().numpy()
-
-    distr = []
-    current = noise[0]
-
-    for i in range(8):
-        movement = (noise[i+1] - noise[i])/8
-        for j in range(8):
-            distr.append(deepcopy(current))
-            if j != 7:
-                current += movement
-    
-    fake_distr = model.model(torch.Tensor(distr)).detach().cpu().numpy()
-    fake_img = ae.decode(fake_distr)
-
-    save_image(torch.Tensor(fake_img)[0:64], MODEL + '_interpolation.png')
-
-    inter = []
-    current = fake_distr[0]
-
-    for i in range(8):
-        movement = (fake_distr[8*(i+1)-1] - fake_distr[8*i])/8
-        for j in range(8):
-            inter.append(deepcopy(current))
-            if j != 7:
-                current += movement
-    
-    fake_img2 = ae.decode(inter)
-
-    save_image(torch.Tensor(fake_img2)[0:64], MODEL + '_interpolation_bad.png')
-'''
-
-#'''
 fake_distr = model.generate(num_batches=1)
 fake_img = ae.decode(fake_distr)
 
-save_image(torch.Tensor(fake_img)[0:64].view(64, 1, 28, 28), 'otgen_mnist.png')
-
-#for i in range(len(fake_img)//16):
-#   display_img(fake_img[i*16:(i+1)*16], PATH, shape=shape, channels_first=True)
-
-'''
-for i in range(100):
-    x, y = np.random.random(size=(2, 100))*2-1
-    gen = model.interpolate(x, y, 16)
-    fake_img = ae.decode(gen)
-
-    display_img(fake_img[0:16], PATH, shape=shape, channels_first=True)
-
-#'''
+fake_img = np.reshape(fake_img, ((BATCH_SIZE_GEN,) + shape))

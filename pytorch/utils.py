@@ -163,6 +163,23 @@ def optimal_transport(inputs, encodings):
 
     return answers
 
+def unload(dataloader):
+    '''
+    Unloads the dataloader fully, into a numpy array.
+    '''
+    data_iter = iter(dataloader)
+    x = next(data_iter)[0].numpy()
+
+    while True:
+        try:
+            x_batch = next(data_iter)[0].numpy()
+            x = np.concatenate((x, x_batch), 0)
+        except StopIteration:
+            break
+
+    return x
+
+
 class View(torch.nn.Module):
     '''
     With this, we can reshape tensors from within
