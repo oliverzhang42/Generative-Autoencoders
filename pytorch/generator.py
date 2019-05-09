@@ -28,8 +28,9 @@ class Generator(Transporter):
 
         steps: (int) Number of iterations to train
         lr: (int) Learning Rate
-        images: (bool) True means images will be stored under self.path, False
-        means they will not
+        images: (bool) Whether to store images or not. NOTE: Images will be
+        unable to be generated if dimension is > 2. This function is for the
+        toy datasets only!!!
         '''
         print("Beginning Generator Training!")
 
@@ -43,8 +44,8 @@ class Generator(Transporter):
             generated = self.model(inputs)
 
             # Samples latent distribution
-            indices = np.random.choice(range(len(self.inputs)), size=self.batch_size)
-            real_vecs = self.inputs[indices]
+            indices = np.random.choice(range(len(self.latent)), size=self.batch_size)
+            real_vecs = self.latent[indices]
 
             # Uses Optimal Transport to compute "Feedback". generated[i] should
             # have actually been answers[i]
@@ -57,7 +58,7 @@ class Generator(Transporter):
             optimizer.step()
             optimizer.zero_grad()
 
-            if i % 100:
+            if i % 100 == 0:
                 print("Loss at step {}: {}".format(i, loss.item()))
             
             if images and i % 1000 == 0:

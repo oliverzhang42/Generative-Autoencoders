@@ -23,6 +23,13 @@ def display_img(x, columns=4):
     x: numpy array containing images to display.
     Must be formatted channels back.
     '''
+
+    # If x has 3 color channels, then we're fine.
+    # However, plt.imshow doesn't work well with 1 channel
+    # So we reshape to remove the channel if that ever happens.
+    if len(x[0][0][0]) == 1:
+        x = np.reshape(x, x.shape[0:3])
+
     rows=len(x)//columns
     fig=plt.figure(figsize=(rows, columns))
 
@@ -51,7 +58,7 @@ def save_points(inputs, answers, path, index=0, lines=False):
         for i in range(512):
             plt.plot([inputs[i][0], answers[i][0]], [inputs[i][1], answers[i][1]], color='red')
 
-    file_path = os.path.join(path, "image{}.png".format(index))
+    file_path = os.path.join(path, "points_{}.png".format(index))
     plt.savefig(file_path)
     plt.clf()
 

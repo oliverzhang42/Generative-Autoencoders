@@ -31,7 +31,7 @@ torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--cuda', type=bool, action='store_true', default=True,
+parser.add_argument('--cuda', type=bool, default=True,
                     help='enables CUDA training')
 parser.add_argument('--dataset', default='mnist',
                     help='dataset name (default: mnist)')
@@ -46,13 +46,13 @@ parser.add_argument('--conv', type=bool, default=False,
                     help='Is your autoencoder convolutional (default: false)')
 parser.add_argument('--dim', type=int, default=30,
                     help='dimension of autoencoder (default: 30)')
-parser.add_argument('--extra-layers', type=int, default=1,
-                    help='Extra layers in the autoencoder (default: 1)')
 parser.add_argument('--load_a', type=bool, default=False,
                     help='Whether to load the autoencoder (default: False)')
 
 parser.add_argument('--batchsize_l', type=int, default=128,
                     help='input batch size for the latent space model (default: 128)')
+parser.add_argument('--latent_distr', default='uniform',
+                    help='input batch size for the latent space model (default: uniform)')
 parser.add_argument('--load_l', type=bool, default=False,
                     help='Whether to load the latent space model (default: False)')
 parser.add_argument('--steps_l', type=int, default=15000,
@@ -70,26 +70,25 @@ AE_STEPS = args.steps_a
 BATCH_SIZE = args.batchsize_a
 CONV = args.conv
 DIM = args.dim
-EXTRA_LAYERS = args.extra-layers
 AE_LOAD = args.load_a
 
 BATCH_SIZE_GEN = args.batchsize_l
+DISTR = args.latent_distr
 GEN_LOAD = args.load_l
 STEPS = args.steps_l
 MODEL = args.model
 
-import pudb; pudb.set_trace()
-
+# Load the right dataset
 if DATASET == 'mnist':
     (x_train, y_train), (x_test, y_test) = mnist.load_data()
     x_train = x_train / 255
     x_test = x_test / 255
-    shape = (28, 28)
+    shape = (1, 28, 28)
 elif DATASET == 'fashion_mnist':
     (x_train, y_train), (x_test, y_test) = fashion_mnist.load_data()
     x_train = x_train / 255
     x_test = x_test / 255
-    shape = (28, 28)
+    shape = (1, 28, 28)
 elif DATASET == 'cifar10':
     (x_train, y_train), (x_test, y_test) = cifar10.load_data()
     x_train = x_train / 255
@@ -115,34 +114,43 @@ elif DATASET == 'faces':
 else:
     raise NotImplementedError
 
-
-ae = Autoencoder(shape, DIM, FOLDER, BATCH_SIZE, EXTRA_LAYERS, CONV)
+# Train the autoencoder
+ae = Autoencoder(shape, DIM, FOLDER, BATCH_SIZE, CONV)
 if AE_LOAD:
     ae.load_weights("autoencoder")
 else:
     if "x_train" in locals():
-        ae.train(AE_STEPS, inputs=x_train, test=x_test, lr=0.003, save_images=True)
+        ae.train(AE_STEPS, x_train, x_test, lr=0.003)
     else:
-        ae.train(AE_STEPS, input_load=train_loader, test_load=test_loader, lr=0.003, save_images=True)
+        ae.train_iter(AE_STEPS, train_loader, test_loader, lr=0.003)
 
+# Prepare the Latent Space Model
 if not 'x_test' in locals():
     x_test = unload(test_loader)
 
 encodings = ae.encode(x_test)
 
 if MODEL == 'transporter':
-    model = Transporter(encodings, DIM, FOLDER, BATCH_SIZE_GEN)
+    model = Transporter(encodings, DISTR, FOLDER, BATCH_SIZE_GEN)
 elif MODEL == 'generator':
-    model = Generator(encodings, DIM, FOLDER, BATCH_SIZE_GEN)
+    model = Generator(encodings, DISTR, FOLDER, BATCH_SIZE_GEN)
 else:
     raise NotImplementedError
 
+# Train the Latent Space Model
 if GEN_LOAD:
     model.load_weights(MODEL)
 else:
     model.train(STEPS, lr=0.0001)
 
-fake_distr = model.generate(num_batches=1)
-fake_img = ae.decode(fake_distr)
+import pudb; pudb.set_trace()
 
+# Display Results
+fake_distr = model.generate(batches=1)
+fake_img = ae.decode(fake_distr)
 fake_img = np.reshape(fake_img, ((BATCH_SIZE_GEN,) + shape))
+
+save_image(torch.Tensor(fake_img), os.path.join(FOLDER, "final.png"))
+
+channels_last = np.rollaxis(fake_img[0:16], 1, 4)
+display_img(channels_last, columns=4)

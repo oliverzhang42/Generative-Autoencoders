@@ -87,8 +87,9 @@ class Transporter():
 
         steps: (int) Number of iterations to train
         lr: (int) Learning Rate
-        images: (bool) True means images will be stored under self.path, False
-        means they will not
+        images: (bool) Whether to store images or not. NOTE: Images will be
+        unable to be generated if dimension is > 2. This function is for the
+        toy datasets only!!!
         '''
         print("Beginning Transporter Training!")
 
@@ -100,7 +101,7 @@ class Transporter():
             inputs = self.noise.sample((self.batch_size, self.dim))
 
             # Samples latent distribution
-            indices = np.random.choice(len(self.inputs), size=self.batch_size)
+            indices = np.random.choice(len(self.latent), size=self.batch_size)
             real_vecs = self.latent[indices]
 
             # Computes optimal transport from inputs to latent. answers[i] will 
@@ -135,7 +136,7 @@ class Transporter():
         outputs = None
 
         for i in range(batches):
-            inputs = self.distr.sample((self.batch_size, self.dim))
+            inputs = self.noise.sample((self.batch_size, self.dim))
             latent_vec = self.model(inputs).detach().cpu().numpy()
 
             if outputs is None:

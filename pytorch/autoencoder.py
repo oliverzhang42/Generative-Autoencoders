@@ -7,7 +7,7 @@ import torch
 import torch.autograd as autograd
 import torch.nn as nn
 import torch.optim as optim
-from torchvision.utils import save_images
+from torchvision.utils import save_image
 
 from utils import *
 
@@ -203,9 +203,9 @@ class Autoencoder():
                 # Every 1000 iterations, save 64 images to see how the autoencoder 
                 # is doing.
                 if i % 1000 == 0:
-                    test_imgs = test_pred.detach().cpu().numpy()[0:64]
-                    save_images(test_imgs.view((64,) + self.img_shape), \
-                        self.path + str(i) + '.png')
+                    test_imgs = test_pred.detach().cpu()[0:64]
+                    save_image(test_imgs.view((64,) + self.img_shape), \
+                        self.path + "/autoenocder_" + str(i) + '.png')
 
                     del test_imgs
                 
@@ -276,9 +276,9 @@ class Autoencoder():
                 # Every 1000 iterations, save 64 images to see how the autoencoder 
                 # is doing.
                 if i % 1000 == 0:
-                    test_imgs = test_pred.detach().cpu().numpy()[0:64]
-                    save_images(test_imgs.view((64,) + self.img_shape), \
-                        self.path + str(i) + '.png')
+                    test_imgs = test_pred.detach().cpu()[0:64]
+                    save_image(test_imgs.view((64,) + self.img_shape), \
+                        self.path + "/autoenocder_" + str(i) + '.png')
 
                     del test_imgs
                 
