@@ -5,13 +5,13 @@ paper is here: [Enter ArXiv link lol]
 
 ### Dependencies
 
-Cuda is required for this to run on your machine.
-
 ```
 python 3.6.7
 pytorch 1.0.1.post2
 matplotlib 3.0.3
 ```
+
+Cuda is required for this to run on your machine.
 
 ### Usage
 
@@ -26,7 +26,15 @@ Run ```python3 main.py -h``` for a list of arguments and then follow them.
 Results will be stored within whatever folder you specify with the --Folder 
 flag.
 
+#### MNIST
+![Images](images/generator_mnist.png)
+
+#### CelebA
+![AE-OTgen Images](images/generator.png)
+
 ### TODO:
-1. Stop using keras for mnist/fashion_mnist downloading lol
+1. Stop using keras for mnist/fashion_mnist downloading lol (DONE)
 2. Get arxiv link lol
-3. Make CPU compatible?
+3. Make a results folder to house all my results from the paper (DONE)
+4. Better Usage in README.md
+5. Make CPU compatible?
