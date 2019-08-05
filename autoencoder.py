@@ -122,7 +122,7 @@ class Autoencoder():
             nn.ReLU(True),
             View(-1, 1024*4*4),                                 # B, 1024*4*4
             nn.Linear(1024*4*4, self.dim),                         # B, z_dim
-            #nn.Sigmoid()
+            nn.Sigmoid()
         )
         self.decoder = nn.Sequential(
             nn.Linear(self.dim, 1024*8*8),                           # B, 1024*8*8
@@ -214,7 +214,7 @@ class Autoencoder():
             
         self.save_weights("autoencoder")
 
-    def train_iter(self, steps, input_load, test_load, lr=0.001):
+    def train_iter(self, steps, input_load, test_load, lr=0.001): #TODO: Change this to input_loader 
         '''
         Train the autoencoder using the data formatted in a torch DataLoader.
 
@@ -306,6 +306,25 @@ class Autoencoder():
                 encodings = pred_batch
             else:
                 encodings = np.concatenate((encodings, pred_batch), 0)
+
+        return encodings
+
+    def encode_iter(self, input_loader):
+        input_iter = iter(input_loader)
+        x = next(data_iter)[0].numpy()
+        encodings = self.encode(x)
+
+        while True:
+            try:
+                x_batch = next(data_iter)[0].numpy()
+                encodings_batch = self.encode(x_batch)
+                encodings = np.concatenate((encodings, encodings_batch), 0)
+
+                del x_batch
+                del encodings_batch
+
+            except StopIteration:
+                break
 
         return encodings
 

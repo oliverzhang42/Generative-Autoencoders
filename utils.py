@@ -1,9 +1,9 @@
 from math import *
 import numpy as np
 import ot
+from ot import gpu
 import os
 import matplotlib.pyplot as plt
-from sklearn import datasets
 import torch
 
 plt.rcParams["figure.figsize"] = [9.0, 6.0]
@@ -41,14 +41,14 @@ def display_img(x, columns=4):
 
     plt.show()
 
-def save_points(inputs, answers, path, index=0, lines=False):
+def save_points(inputs, answers, path, name='image', lines=False):
     '''
     Saves an img of points in a scatterplot using matplotlib
 
     inputs: (list or np array) Points to plot
     answers: (list or np array) Points to plot
     path: (str) Where to save the points
-    index: (int) Used to name the image
+    name: (str) Name of the image file
     lines: (bool) Whether to draw lines from inputs[i] to answers[i]
     '''
     plt.scatter(inputs[:,0], inputs[:,1], color='blue')
@@ -58,7 +58,7 @@ def save_points(inputs, answers, path, index=0, lines=False):
         for i in range(512):
             plt.plot([inputs[i][0], answers[i][0]], [inputs[i][1], answers[i][1]], color='red')
 
-    file_path = os.path.join(path, "points_{}.png".format(index))
+    file_path = os.path.join(path, "{}.png".format(name))
     plt.savefig(file_path)
     plt.clf()
 
@@ -67,8 +67,8 @@ def make_moons(train=60000, test=10000, noise=0.05):
     Makes the moons datasets. See
     https://scikit-learn.org/stable/modules/generated/sklearn.datasets.make_moons.html
     '''
-    moons_train, train_labels = datasets.make_moons(n_samples=train, noise=noise)
-    moons_test, test_labels = datasets.make_moons(n_samples=test, noise=noise)
+    moons_train, train_labels = sklearn.datasets.make_moons(n_samples=train, noise=noise)
+    moons_test, test_labels = sklearn.datasets.make_moons(n_samples=test, noise=noise)
     return moons_train, moons_test
 
 def make_circles(train=60000, test=10000, noise=0.05):
@@ -76,11 +76,11 @@ def make_circles(train=60000, test=10000, noise=0.05):
     Makes the circles datasets. See
     https://scikit-learn.org/stable/modules/generated/sklearn.datasets.make_circles.html
     '''
-    moon_train, _ = datasets.make_circles(n_samples=train, noise=noise, factor=0.5)
-    moon_test, _ = datasets.make_circles(n_samples=test, noise=noise, factor=0.5)
+    moon_train, _ = sklearn.datasets.make_circles(n_samples=train, noise=noise, factor=0.5)
+    moon_test, _ = sklearn.datasets.make_circles(n_samples=test, noise=noise, factor=0.5)
     return moon_train, moon_test
 
-def two_custer(train=60000, test=10000, noise_scale=0.1):
+def two_cluster(train=60000, test=10000, noise_scale=0.1):
     '''
     Makes a toy dataset with two clusters. Clusters are centered
     at (1,0), (-1,0), are normal, and have a stdev = noise_scale.
@@ -142,12 +142,15 @@ def eight_cluster(train=60000, test=10000, noise_scale=0.1):
 
     return np.array(x_train), np.array(x_test)
 
-def optimal_transport(inputs, encodings):
+def optimal_transport(inputs, encodings, log=False):
     '''
     Computes optimal transport for one batch.
 
     inputs (np array): Inputs of the optimal transport mapping
     encodings (np array): Outputs of the optimal transport mapping
+
+    return answers: Index array. encodings[answers[0]] corresponds with
+    inputs[0]
     '''
 
     batch_size = len(inputs)
@@ -158,10 +161,42 @@ def optimal_transport(inputs, encodings):
     M = ot.dist(inputs, encodings)
     M = np.array(M)
 
-    mapping = ot.emd(a, b, M, numItermax=1000000)
+    if log:
+        mapping, log = ot.emd(a, b, M, numItermax=1000000)
+    else:
+        mapping = ot.emd(a, b, M, numItermax=1000000)
 
     answers = []
       
+    for j in range(batch_size):
+        index = np.argmax(mapping[j])
+        answers.append(index)
+
+    answers = np.array(answers)
+
+    if log:
+        return answers, log
+    else:
+        return answers
+
+def sinkhorn_transport(inputs, encodings, reg):
+    '''
+    '''
+
+    batch_size = len(inputs)
+
+    a = np.ones((batch_size, ))
+    b = np.ones((batch_size, ))
+
+    import pudb; pudb.set_trace()
+
+    M = gpu.dist(inputs, encodings)
+    #M = 10*M
+
+    mapping = gpu.sinkhorn(a, b, M, reg)
+
+    answers = []
+    
     for j in range(batch_size):
         index = np.argmax(mapping[j])
         answers.append(index)
@@ -186,6 +221,31 @@ def unload(dataloader):
 
     return x
 
+def reg_stdev(generated, answers, lambda_=1):
+    gen_stdev = generated.std(0)
+    ans_stdev = answers.std(0)
+
+    return lambda_ * torch.abs(gen_stdev - ans_stdev).mean()
+
+def reg_cyclic(generated, answers, lambda_=1):
+    rand1 = np.random.choice(range(generated.shape[0]), 1000)
+    rand2 = np.random.choice(range(generated.shape[0]), 1000)
+    rand3 = np.random.choice(range(generated.shape[0]), 1000)
+    rand4 = np.random.choice(range(generated.shape[0]), 1000)
+
+    # total implies .mean(), separated_along_dimension implies .mean(0)
+    generated_cyclic = torch.abs(generated[rand1] - generated[rand2]).mean(0)
+    real_cyclic = torch.abs(answers[rand3] - answers[rand4]).mean(0)
+
+    return lambda_ * torch.abs(generated_cyclic - real_cyclic).mean()
+
+def unbounded_cyclic(generated, lambda_=1):
+    rand1 = np.random.choice(range(generated.shape[0]), 1000)
+    rand2 = np.random.choice(range(generated.shape[0]), 1000)
+
+    generated_cyclic = torch.abs(generated[rand1] - generated[rand2]).mean(0)
+
+    return - lambda_ * torch.abs(generated_cyclic).mean()
 
 class View(torch.nn.Module):
     '''

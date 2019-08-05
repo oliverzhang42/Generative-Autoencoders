@@ -1,7 +1,7 @@
 # Optimal Transport Based Generative Autoencoders
 
 This is the official pytorch implementation of AE-OTgen and AE-OTtrans. The 
-paper is here: [Enter ArXiv link lol]
+paper is here: [Waiting for verification on ArXiv]
 
 ### Dependencies
 
@@ -9,6 +9,7 @@ paper is here: [Enter ArXiv link lol]
 python 3.6.7
 pytorch 1.0.1.post2
 matplotlib 3.0.3
+POT (python optimal transport) 0.5.1
 ```
 
 Cuda is required for this to run on your machine.
@@ -24,7 +25,7 @@ Run ```python3 main.py -h``` for a list of arguments and then follow them.
 
 ### Results
 Results will be stored within whatever folder you specify with the --Folder 
-flag.
+flag. Here are some example generated images using AE-OTgen.
 
 #### MNIST
 ![Images](images/generator_mnist.png)
@@ -37,4 +38,3 @@ flag.
 2. Get arxiv link lol
 3. Make a results folder to house all my results from the paper (DONE)
 4. Better Usage in README.md
-5. Make CPU compatible?

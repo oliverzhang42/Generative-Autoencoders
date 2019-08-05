@@ -1,4 +1,3 @@
-import argparse
 from copy import deepcopy
 import numpy as np
 import os
@@ -65,7 +64,9 @@ class Transporter():
             torch.nn.Linear(H, H),
             torch.nn.LeakyReLU(),
             torch.nn.Linear(H, self.dim),
+            torch.nn.Sigmoid()
         )
+        print("Sigmoid is added at the end of the generator")
 
     def save_weights(self, name):
         '''
@@ -120,7 +121,11 @@ class Transporter():
                 print("Loss at step {}: {}".format(i, loss.item()))
             
             if images and i % 1000 == 0:
-                save_points(generated.detach().cpu(), answers.cpu(), self.path, index=i)
+                save_points(generated.detach().cpu(), answers.cpu(), self.path, name="points_{}".format(i))
+
+            if i % 1000 == 0:
+                print("Saving checkpoint at 'transporter_{}'".format(i))
+                self.save_weights("transporter_{}".format(i))
 
         print("Saving Transporter Weights...")
         self.save_weights("transporter")
@@ -164,3 +169,22 @@ class Transporter():
             inputs.append(deepcopy(current))
 
         return self.model(torch.Tensor(inputs)).detach().cpu().numpy()
+
+    def evaluate(self):
+        '''
+        Evaluates how good the model is doing by calculating the optimal
+        transport mapping from the model's predictions to some true data
+        and then taking the average distance.
+        '''
+        generated = self.generate(batches=1)
+        
+        # Samples latent distribution
+        indices = np.random.choice(len(self.latent), size=self.batch_size)
+        real_vecs = self.latent[indices].cpu().numpy()
+
+        answer_indices = optimal_transport(generated, real_vecs)
+
+        distances = np.linalg.norm(generated - real_vecs[answer_indices], axis=1)
+        mean_distance = np.mean(distances)
+
+        print("Mean distance: {}".format(mean_distance))
